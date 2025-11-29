@@ -63,9 +63,14 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Подключение маршрутов (будут добавлены позже)
-// const authRoutes = require('./src/routes/auth.routes');
-// app.use('/api/auth', authRoutes);
+// Подключение маршрутов
+const authRoutes = require('./src/routes/auth.routes');
+const chatRoutes = require('./src/routes/chat.routes');
+const messageRoutes = require('./src/routes/message.routes');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/chats', chatRoutes);
+app.use('/api/messages', messageRoutes);
 
 const PORT = process.env.PORT || 3001;
 
