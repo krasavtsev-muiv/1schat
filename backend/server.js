@@ -37,13 +37,8 @@ query('SELECT NOW()')
   });
 
 // WebSocket подключения
-io.on('connection', (socket) => {
-  console.log('Новое WebSocket подключение:', socket.id);
-
-  socket.on('disconnect', () => {
-    console.log('WebSocket отключен:', socket.id);
-  });
-});
+const { handleConnection } = require('./src/services/websocket/chat.socket');
+handleConnection(io);
 
 // Базовые маршруты
 app.get('/', (req, res) => {
@@ -71,6 +66,7 @@ const messageRoutes = require('./src/routes/message.routes');
 app.use('/api/auth', authRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/files', require('./src/routes/file.routes'));
 
 const PORT = process.env.PORT || 3001;
 
