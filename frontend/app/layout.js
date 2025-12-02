@@ -2,6 +2,7 @@
 import './globals.css';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import Breadcrumbs from '@/components/Breadcrumbs';
 
 export const metadata = {
   title: 'Веб-сервис чата',
@@ -13,6 +14,7 @@ export default function RootLayout({ children }) {
     <html lang="ru">
       <body style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <Header />
+        <Breadcrumbs />
         <main style={{ flex: 1 }}>{children}</main>
         <Footer />
       </body>
