@@ -71,6 +71,7 @@ app.use('/api/export', require('./src/routes/export.routes'));
 app.use('/api/notifications', require('./src/routes/notification.routes'));
 app.use('/api/feedback', require('./src/routes/feedback.routes'));
 app.use('/api/admin', require('./src/routes/admin.routes'));
+app.use('/api/1c', require('./src/routes/1c-integration.routes'));
 
 const PORT = process.env.PORT || 3001;
 
