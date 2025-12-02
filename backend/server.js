@@ -70,6 +70,7 @@ app.use('/api/files', require('./src/routes/file.routes'));
 app.use('/api/export', require('./src/routes/export.routes'));
 app.use('/api/notifications', require('./src/routes/notification.routes'));
 app.use('/api/feedback', require('./src/routes/feedback.routes'));
+app.use('/api/admin', require('./src/routes/admin.routes'));
 
 const PORT = process.env.PORT || 3001;
 
