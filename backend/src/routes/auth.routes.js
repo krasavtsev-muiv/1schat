@@ -5,10 +5,11 @@ const authController = require('../controllers/auth.controller');
 const { authenticateToken } = require('../middleware/auth.middleware');
 
 // Регистрация
-router.post('/register', authController.register);
+const { validateRegister, validateLoginData } = require('../middleware/validation.middleware');
+router.post('/register', validateRegister, authController.register);
 
 // Вход
-router.post('/login', authController.login);
+router.post('/login', validateLoginData, authController.login);
 
 // Получение текущего пользователя (требует аутентификации)
 router.get('/me', authenticateToken, authController.getCurrentUser);
