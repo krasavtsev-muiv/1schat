@@ -58,6 +58,10 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Middleware для обработки ошибок (должен быть последним)
+const errorHandler = require('./src/middleware/error.middleware');
+app.use(errorHandler);
+
 // Подключение маршрутов
 const authRoutes = require('./src/routes/auth.routes');
 const chatRoutes = require('./src/routes/chat.routes');
