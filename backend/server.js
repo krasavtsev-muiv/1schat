@@ -17,6 +17,9 @@ const io = socketIo(server, {
 });
 
 // Middleware
+const requestLogger = require('./src/middleware/logger.middleware');
+app.use(requestLogger);
+
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: true,
