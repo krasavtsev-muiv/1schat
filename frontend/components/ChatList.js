@@ -4,25 +4,28 @@
 import { useState, useEffect } from 'react';
 import { chatAPI } from '@/lib/api';
 
-export default function ChatList({ onSelectChat }) {
+export default function ChatList({ onSelectChat, refreshKey }) {
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadChats();
-  }, []);
-
   const loadChats = async () => {
     try {
+      setLoading(true);
       const response = await chatAPI.getUserChats();
       setChats(response.data.chats);
+      setError('');
     } catch (err) {
       setError('Ошибка загрузки чатов');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadChats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   if (loading) return <div>Загрузка...</div>;
   if (error) return <div style={{ color: 'red' }}>{error}</div>;

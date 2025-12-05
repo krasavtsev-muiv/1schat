@@ -38,6 +38,7 @@ export const authAPI = {
   register: (data) => api.post('/api/auth/register', data),
   login: (data) => api.post('/api/auth/login', data),
   getCurrentUser: () => api.get('/api/auth/me'),
+  getUsers: (params) => api.get('/api/auth/users', { params }),
 };
 
 // API методы для чатов

@@ -1,6 +1,7 @@
 // Контроллер для аутентификации
 const User = require('../models/user.model');
-const { generateToken } = require('../utils/jwt.util');
+const Session = require('../models/session.model');
+const { generateToken, getTokenExpiration } = require('../utils/jwt.util');
 const { hashPassword, comparePassword } = require('../utils/password.util');
 
 // Регистрация нового пользователя
@@ -66,22 +67,29 @@ const register = async (req, res) => {
 // Вход в систему
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email и пароль обязательны' });
+    // Поддержка входа по username или email
+    const loginField = username || email;
+    
+    if (!loginField || !password) {
+      return res.status(400).json({ error: 'Логин (или email) и пароль обязательны' });
     }
 
-    // Поиск пользователя
-    const user = await User.findByEmail(email);
+    // Поиск пользователя по username или email
+    let user = await User.findByUsername(loginField);
     if (!user) {
-      return res.status(401).json({ error: 'Неверный email или пароль' });
+      user = await User.findByEmail(loginField);
+    }
+    
+    if (!user) {
+      return res.status(401).json({ error: 'Неверный логин (или email) или пароль' });
     }
 
     // Проверка пароля
     const isPasswordValid = await comparePassword(password, user.password_hash);
     if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Неверный email или пароль' });
+      return res.status(401).json({ error: 'Неверный логин (или email) или пароль' });
     }
 
     // Проверка активности пользователя
@@ -94,6 +102,24 @@ const login = async (req, res) => {
 
     // Генерация токена
     const token = generateToken(user.user_id, user.role_id);
+
+    // Создание сессии пользователя
+    const expiresAt = getTokenExpiration();
+    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    try {
+      await Session.create({
+        user_id: user.user_id,
+        session_token: token,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        expires_at: expiresAt
+      });
+    } catch (sessionError) {
+      console.error('Ошибка создания сессии:', sessionError);
+      // Не прерываем процесс входа, если не удалось создать сессию
+    }
 
     // Удаляем пароль из ответа
     delete user.password_hash;
@@ -125,9 +151,51 @@ const getCurrentUser = async (req, res) => {
   }
 };
 
+// Выход из системы
+const logout = async (req, res) => {
+  try {
+    if (req.sessionId) {
+      await Session.deactivate(req.sessionId);
+    }
+    
+    res.json({ message: 'Успешный выход из системы' });
+  } catch (error) {
+    console.error('Ошибка выхода:', error);
+    res.status(500).json({ error: 'Ошибка при выходе из системы' });
+  }
+};
+
+// Получение списка пользователей (для выбора собеседников)
+const getUsers = async (req, res) => {
+  try {
+    const { search } = req.query;
+    const filters = {
+      is_active: true,
+    };
+    if (search) {
+      filters.search = search;
+    }
+
+    const users = await User.findAll(filters);
+    
+    // Удаляем пароли из ответа
+    const usersWithoutPasswords = users.map(user => {
+      delete user.password_hash;
+      return user;
+    });
+
+    res.json({ users: usersWithoutPasswords });
+  } catch (error) {
+    console.error('Ошибка получения пользователей:', error);
+    res.status(500).json({ error: 'Ошибка при получении списка пользователей' });
+  }
+};
+
 module.exports = {
   register,
   login,
   getCurrentUser,
+  logout,
+  getUsers,
 };
 

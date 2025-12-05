@@ -26,9 +26,45 @@ const decodeToken = (token) => {
   return jwt.decode(token);
 };
 
+// Получить время истечения токена
+const getTokenExpiration = () => {
+  const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
+  const expirationDate = new Date();
+  
+  // Парсинг формата '7d', '30d', '1h' и т.д.
+  const match = expiresIn.match(/^(\d+)([dhms])$/);
+  if (match) {
+    const value = parseInt(match[1]);
+    const unit = match[2];
+    
+    switch (unit) {
+      case 'd':
+        expirationDate.setDate(expirationDate.getDate() + value);
+        break;
+      case 'h':
+        expirationDate.setHours(expirationDate.getHours() + value);
+        break;
+      case 'm':
+        expirationDate.setMinutes(expirationDate.getMinutes() + value);
+        break;
+      case 's':
+        expirationDate.setSeconds(expirationDate.getSeconds() + value);
+        break;
+      default:
+        expirationDate.setDate(expirationDate.getDate() + 7); // По умолчанию 7 дней
+    }
+  } else {
+    // Если формат не распознан, используем 7 дней по умолчанию
+    expirationDate.setDate(expirationDate.getDate() + 7);
+  }
+  
+  return expirationDate;
+};
+
 module.exports = {
   generateToken,
   verifyToken,
   decodeToken,
+  getTokenExpiration,
 };
 

@@ -51,11 +51,14 @@ const validateRegistration = (data) => {
 const validateLogin = (data) => {
   const errors = [];
 
-  if (!data.email || !isValidEmail(data.email)) {
-    errors.push('Некорректный email адрес');
+  // Поддержка входа по username или email
+  const loginField = data.username || data.email;
+  
+  if (!loginField || loginField.trim().length === 0) {
+    errors.push('Логин или email обязателен');
   }
 
-  if (!data.password) {
+  if (!data.password || data.password.trim().length === 0) {
     errors.push('Пароль обязателен');
   }
 

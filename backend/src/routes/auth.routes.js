@@ -14,5 +14,11 @@ router.post('/login', validateLoginData, authController.login);
 // Получение текущего пользователя (требует аутентификации)
 router.get('/me', authenticateToken, authController.getCurrentUser);
 
+// Выход из системы (требует аутентификации)
+router.post('/logout', authenticateToken, authController.logout);
+
+// Получение списка пользователей (требует аутентификации)
+router.get('/users', authenticateToken, authController.getUsers);
+
 module.exports = router;
 

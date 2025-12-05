@@ -1,6 +1,7 @@
 // Middleware для аутентификации и авторизации
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+const Session = require('../models/session.model');
 
 // Проверка JWT токена
 const authenticateToken = async (req, res, next) => {
@@ -14,6 +15,12 @@ const authenticateToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
+    // Проверяем сессию в БД
+    const session = await Session.findByToken(token);
+    if (!session) {
+      return res.status(401).json({ error: 'Сессия не найдена или истекла' });
+    }
+    
     // Получаем пользователя из БД
     const user = await User.findById(decoded.userId);
     
@@ -21,8 +28,12 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ error: 'Пользователь не найден или неактивен' });
     }
 
+    // Обновляем время последней активности сессии
+    await Session.updateLastActivity(session.session_id);
+
     req.user = user;
     req.userId = user.user_id;
+    req.sessionId = session.session_id;
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {

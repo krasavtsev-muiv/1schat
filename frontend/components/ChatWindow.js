@@ -78,13 +78,18 @@ export default function ChatWindow({ chat }) {
         <h3>{chat.chat_name || 'Чат'}</h3>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
-        {messages.map((msg) => (
-          <div key={msg.message_id} style={{ marginBottom: '1rem' }}>
-            <strong>{msg.username || 'Пользователь'}</strong>
-            <p>{msg.message_text}</p>
-            <small>{new Date(msg.created_at).toLocaleString('ru-RU')}</small>
-          </div>
-        ))}
+        {messages.map((msg) => {
+          // Формируем имя отправителя: сначала пробуем имя и фамилию, потом username
+          const senderName = `${msg.first_name || ''} ${msg.last_name || ''}`.trim() || msg.username || 'Пользователь';
+          
+          return (
+            <div key={msg.message_id} style={{ marginBottom: '1rem' }}>
+              <strong>{senderName}</strong>
+              <p>{msg.message_text}</p>
+              <small>{new Date(msg.created_at).toLocaleString('ru-RU')}</small>
+            </div>
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
       <form onSubmit={sendMessage} style={{ padding: '1rem', borderTop: '1px solid #dee2e6' }}>

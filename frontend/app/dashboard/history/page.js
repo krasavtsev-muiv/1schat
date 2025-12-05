@@ -1,12 +1,12 @@
 // Страница истории сообщений
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { messageAPI } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 
-export default function HistoryPage() {
+function HistoryContent() {
   const searchParams = useSearchParams();
   const chatId = searchParams.get('chatId');
   const [messages, setMessages] = useState([]);
@@ -16,6 +16,7 @@ export default function HistoryPage() {
     if (chatId) {
       loadMessages();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId]);
 
   const loadMessages = async () => {
@@ -54,6 +55,14 @@ export default function HistoryPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={<div>Загрузка...</div>}>
+      <HistoryContent />
+    </Suspense>
   );
 }
 

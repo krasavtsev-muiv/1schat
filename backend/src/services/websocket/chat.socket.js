@@ -73,15 +73,13 @@ const handleConnection = (io) => {
         // Получение данных отправителя
         const sender = await User.findById(socket.userId);
 
-        // Отправка сообщения всем участникам чата
+        // Отправка сообщения всем участникам чата в том же формате, что и API
         io.to(`chat_${chat_id}`).emit('new_message', {
           ...message,
-          sender: {
-            username: sender.username,
-            first_name: sender.first_name,
-            last_name: sender.last_name,
-            avatar_url: sender.avatar_url
-          }
+          username: sender.username,
+          first_name: sender.first_name,
+          last_name: sender.last_name,
+          avatar_url: sender.avatar_url
         });
       } catch (error) {
         console.error('Ошибка отправки сообщения через WebSocket:', error);
