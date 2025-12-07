@@ -3,64 +3,128 @@ const User = require('../models/user.model');
 const Session = require('../models/session.model');
 const { generateToken, getTokenExpiration } = require('../utils/jwt.util');
 const { hashPassword, comparePassword } = require('../utils/password.util');
+const registrationService = require('../services/registration.service');
+const oneCService = require('../services/1c-integration.service');
+const logger = require('../utils/logger');
 
-// Регистрация нового пользователя
-const register = async (req, res) => {
+// Проверка кода пользователя в 1С (для регистрации)
+const checkCode = async (req, res) => {
   try {
-    const {
-      username,
-      email,
-      password,
-      first_name,
-      last_name,
-      middle_name,
-      phone,
-      role_id = 3, // По умолчанию студент
-      faculty,
-      department,
-      position,
-      student_group
-    } = req.body;
+    const { code, role, group } = req.body;
 
-    // Проверка существования пользователя
-    const existingUser = await User.findByEmail(email) || await User.findByUsername(username);
-    if (existingUser) {
-      return res.status(400).json({ error: 'Пользователь с таким email или username уже существует' });
+    if (!code || !role) {
+      return res.status(400).json({ error: 'Код и роль обязательны' });
     }
 
-    // Хеширование пароля
-    const password_hash = await hashPassword(password);
+    if (role === 'student') {
+      if (!group) {
+        return res.status(400).json({ error: 'Для студента необходимо указать группу' });
+      }
+      const result = await registrationService.checkStudentCode(code, group);
+      if (!result.valid) {
+        return res.status(400).json({ error: result.error });
+      }
+      return res.json({
+        valid: true,
+        message: 'Код студента подтверждён',
+        data: {
+          code: result.data.Код,
+          name: `${result.data.Фамилия} ${result.data.Имя} ${result.data.Отчество || ''}`.trim(),
+          group: result.data.Группа,
+          department: result.data.Кафедра,
+        },
+      });
+    } else if (role === 'teacher') {
+      const result = await registrationService.checkTeacherCode(code);
+      if (!result.valid) {
+        return res.status(400).json({ error: result.error });
+      }
+      return res.json({
+        valid: true,
+        message: 'Код преподавателя подтверждён',
+        data: {
+          code: result.data.Код,
+          name: `${result.data.Фамилия} ${result.data.Имя} ${result.data.Отчество || ''}`.trim(),
+          discipline: result.data.Дисциплина?.Наименование || result.data.Дисциплина,
+        },
+      });
+    } else {
+      return res.status(400).json({ error: 'Неверная роль. Используйте "student" или "teacher"' });
+    }
+  } catch (error) {
+    logger.error('Ошибка проверки кода:', error);
+    res.status(500).json({ error: 'Ошибка при проверке кода' });
+  }
+};
 
-    // Создание пользователя
-    const user = await User.create({
-      username,
-      email,
-      password_hash,
-      first_name,
-      last_name,
-      middle_name,
-      phone,
-      role_id,
-      faculty,
-      department,
-      position,
-      student_group
+// Получение списка групп из 1С (для формы регистрации)
+const getGroups = async (req, res) => {
+  try {
+    const groups = await oneCService.getGroups();
+    res.json({
+      success: true,
+      data: groups,
     });
+  } catch (error) {
+    logger.error('Ошибка получения групп из 1С:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Ошибка при получении групп',
+    });
+  }
+};
+
+// Регистрация нового пользователя с данными из 1С
+const register = async (req, res) => {
+  try {
+    const { code, role, password, group } = req.body;
+
+    if (!code || !role || !password) {
+      return res.status(400).json({ error: 'Код, роль и пароль обязательны' });
+    }
+
+    let result;
+    if (role === 'student') {
+      if (!group) {
+        return res.status(400).json({ error: 'Для студента необходимо указать группу' });
+      }
+      // Проверяем код студента
+      const checkResult = await registrationService.checkStudentCode(code, group);
+      if (!checkResult.valid) {
+        return res.status(400).json({ error: checkResult.error });
+      }
+      // Регистрируем студента
+      result = await registrationService.registerStudent(checkResult.data, password);
+    } else if (role === 'teacher') {
+      // Проверяем код преподавателя
+      const checkResult = await registrationService.checkTeacherCode(code);
+      if (!checkResult.valid) {
+        return res.status(400).json({ error: checkResult.error });
+      }
+      // Регистрируем преподавателя
+      result = await registrationService.registerTeacher(checkResult.data, password);
+    } else {
+      return res.status(400).json({ error: 'Неверная роль. Используйте "student" или "teacher"' });
+    }
+
+    if (!result.success) {
+      return res.status(500).json({ error: 'Ошибка при регистрации пользователя' });
+    }
 
     // Генерация токена
-    const token = generateToken(user.user_id, user.role_id);
+    const token = generateToken(result.user.user_id, result.user.role_id);
 
     // Удаляем пароль из ответа
-    delete user.password_hash;
+    delete result.user.password_hash;
 
     res.status(201).json({
       message: 'Пользователь успешно зарегистрирован',
-      user,
-      token
+      user: result.user,
+      token,
     });
   } catch (error) {
-    console.error('Ошибка регистрации:', error);
-    res.status(500).json({ error: 'Ошибка при регистрации пользователя' });
+    logger.error('Ошибка регистрации:', error);
+    res.status(500).json({ error: error.message || 'Ошибка при регистрации пользователя' });
   }
 };
 
@@ -117,7 +181,7 @@ const login = async (req, res) => {
         expires_at: expiresAt
       });
     } catch (sessionError) {
-      console.error('Ошибка создания сессии:', sessionError);
+      logger.error('Ошибка создания сессии:', sessionError);
       // Не прерываем процесс входа, если не удалось создать сессию
     }
 
@@ -130,7 +194,7 @@ const login = async (req, res) => {
       token
     });
   } catch (error) {
-    console.error('Ошибка входа:', error);
+    logger.error('Ошибка входа:', error);
     res.status(500).json({ error: 'Ошибка при входе в систему' });
   }
 };
@@ -146,7 +210,7 @@ const getCurrentUser = async (req, res) => {
     delete user.password_hash;
     res.json({ user });
   } catch (error) {
-    console.error('Ошибка получения пользователя:', error);
+    logger.error('Ошибка получения пользователя:', error);
     res.status(500).json({ error: 'Ошибка при получении данных пользователя' });
   }
 };
@@ -160,7 +224,7 @@ const logout = async (req, res) => {
     
     res.json({ message: 'Успешный выход из системы' });
   } catch (error) {
-    console.error('Ошибка выхода:', error);
+    logger.error('Ошибка выхода:', error);
     res.status(500).json({ error: 'Ошибка при выходе из системы' });
   }
 };
@@ -186,16 +250,17 @@ const getUsers = async (req, res) => {
 
     res.json({ users: usersWithoutPasswords });
   } catch (error) {
-    console.error('Ошибка получения пользователей:', error);
+    logger.error('Ошибка получения пользователей:', error);
     res.status(500).json({ error: 'Ошибка при получении списка пользователей' });
   }
 };
 
 module.exports = {
+  checkCode,
+  getGroups,
   register,
   login,
   getCurrentUser,
   logout,
   getUsers,
 };
-
