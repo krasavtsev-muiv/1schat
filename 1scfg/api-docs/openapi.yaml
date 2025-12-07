@@ -1,0 +1,835 @@
+openapi: 3.0.3
+info:
+  title: Educational Information System API
+  description: |
+    API для работы с учебной информационной системой.
+    Предоставляет методы для управления кафедрами, группами, дисциплинами, студентами и преподавателями.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:3040/PD/hs/eis
+    description: Локальный сервер разработки
+  - url: https://your-domain.com/hs/eis
+    description: Продакшн сервер
+
+tags:
+  - name: Кафедры
+    description: Операции с кафедрами
+  - name: Группы
+    description: Операции с группами
+  - name: Дисциплины
+    description: Операции с дисциплинами
+  - name: Преподаватели
+    description: Операции с преподавателями
+  - name: Студенты
+    description: Операции со студентами
+  - name: Пользователи
+    description: Операции с пользователями системы
+
+paths:
+  /Departments:
+    get:
+      tags:
+        - Кафедры
+      summary: Получить список всех кафедр
+      description: Возвращает список всех кафедр в системе
+      operationId: getDepartments
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentsResponse'
+    
+    post:
+      tags:
+        - Кафедры
+      summary: Добавить новую кафедру
+      description: Создает новую кафедру в системе
+      operationId: addDepartment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddDepartmentRequest'
+      responses:
+        '200':
+          description: Кафедра успешно добавлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /Groups:
+    get:
+      tags:
+        - Группы
+      summary: Получить список всех групп
+      description: Возвращает список всех групп с информацией о кафедрах
+      operationId: getGroups
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupsResponse'
+    
+    post:
+      tags:
+        - Группы
+      summary: Добавить новую группу
+      description: Создает новую группу в системе
+      operationId: addGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddGroupRequest'
+      responses:
+        '200':
+          description: Группа успешно добавлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Кафедра не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /Disciplines:
+    get:
+      tags:
+        - Дисциплины
+      summary: Получить список всех дисциплин
+      description: Возвращает список всех дисциплин с информацией о кафедрах
+      operationId: getDisciplines
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisciplinesResponse'
+    
+    post:
+      tags:
+        - Дисциплины
+      summary: Добавить новую дисциплину
+      description: Создает новую дисциплину в системе
+      operationId: addDiscipline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddDisciplineRequest'
+      responses:
+        '200':
+          description: Дисциплина успешно добавлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Кафедра не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /Teachers:
+    get:
+      tags:
+        - Преподаватели
+      summary: Получить список всех преподавателей
+      description: Возвращает список всех преподавателей с информацией о дисциплинах
+      operationId: getTeachers
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeachersResponse'
+    
+    post:
+      tags:
+        - Преподаватели
+      summary: Добавить нового преподавателя
+      description: Создает нового преподавателя в системе
+      operationId: addTeacher
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTeacherRequest'
+      responses:
+        '200':
+          description: Преподаватель успешно добавлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Дисциплина не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /TeachersFull:
+    get:
+      tags:
+        - Преподаватели
+      summary: Получить полную информацию о всех преподавателях
+      description: Возвращает полную информацию о преподавателях, включая их дисциплины и список студентов по каждой дисциплине
+      operationId: getTeachersFull
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeachersFullResponse'
+
+  /TeachersFull/{КодПреподавателя}:
+    get:
+      tags:
+        - Преподаватели
+      summary: Получить полную информацию о преподавателе по коду
+      description: Возвращает полную информацию о конкретном преподавателе по его коду
+      operationId: getTeacherFullByCode
+      parameters:
+        - name: КодПреподавателя
+          in: path
+          required: true
+          description: Код преподавателя
+          schema:
+            type: string
+            example: "000000001"
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeacherFullResponse'
+        '400':
+          description: Код преподавателя не указан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Преподаватель не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /Students:
+    get:
+      tags:
+        - Студенты
+      summary: Получить список всех студентов
+      description: Возвращает список всех студентов с основной информацией
+      operationId: getStudents
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentsResponse'
+    
+    post:
+      tags:
+        - Студенты
+      summary: Добавить нового студента
+      description: Создает нового студента в системе
+      operationId: addStudent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddStudentRequest'
+      responses:
+        '200':
+          description: Студент успешно добавлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Кафедра или группа не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /StudentsFull:
+    get:
+      tags:
+        - Студенты
+      summary: Получить полную информацию о всех студентах
+      description: Возвращает полную информацию о студентах, включая их дисциплины и преподавателей по каждой дисциплине
+      operationId: getStudentsFull
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentsFullResponse'
+
+  /StudentsFull/{КодСтудента}:
+    get:
+      tags:
+        - Студенты
+      summary: Получить полную информацию о студенте по коду
+      description: Возвращает полную информацию о конкретном студенте по его коду
+      operationId: getStudentFullByCode
+      parameters:
+        - name: КодСтудента
+          in: path
+          required: true
+          description: Код студента
+          schema:
+            type: string
+            example: "000000001"
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentFullResponse'
+        '400':
+          description: Код студента не указан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Студент не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /Users:
+    get:
+      tags:
+        - Пользователи
+      summary: Получить список всех пользователей
+      description: Возвращает объединенный список всех студентов и преподавателей с указанием их принадлежности
+      operationId: getUsers
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersResponse'
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Не указано наименование кафедры"
+
+    SuccessResponse:
+      type: object
+      required:
+        - success
+        - message
+        - Код
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Кафедра успешно добавлена"
+        Код:
+          type: string
+          example: "000000001"
+
+    Department:
+      type: object
+      properties:
+        Код:
+          type: string
+          example: "000000001"
+        Наименование:
+          type: string
+          example: "Кафедра информационных технологий"
+
+    DepartmentsResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Department'
+
+    AddDepartmentRequest:
+      type: object
+      required:
+        - Наименование
+      properties:
+        Наименование:
+          type: string
+          example: "Кафедра информационных технологий"
+
+    Group:
+      type: object
+      properties:
+        Код:
+          type: string
+          example: "000000001"
+        Наименование:
+          type: string
+          example: "ИТ-21"
+        Кафедра:
+          type: string
+          example: "Кафедра информационных технологий"
+
+    GroupsResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Group'
+
+    AddGroupRequest:
+      type: object
+      required:
+        - Наименование
+        - Кафедра
+      properties:
+        Наименование:
+          type: string
+          example: "ИТ-21"
+        Кафедра:
+          type: string
+          example: "Кафедра информационных технологий"
+
+    Discipline:
+      type: object
+      properties:
+        Код:
+          type: string
+          example: "000000001"
+        Наименование:
+          type: string
+          example: "Основы программирования"
+        Кафедра:
+          type: string
+          example: "Кафедра информационных технологий"
+
+    DisciplinesResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Discipline'
+
+    AddDisciplineRequest:
+      type: object
+      required:
+        - Наименование
+        - Кафедра
+      properties:
+        Наименование:
+          type: string
+          example: "Основы программирования"
+        Кафедра:
+          type: string
+          example: "Кафедра информационных технологий"
+
+    Teacher:
+      type: object
+      properties:
+        Код:
+          type: string
+          example: "000000001"
+        Фамилия:
+          type: string
+          example: "Иванов"
+        Имя:
+          type: string
+          example: "Иван"
+        Отчество:
+          type: string
+          example: "Иванович"
+        Дисциплина:
+          type: string
+          example: "Основы программирования"
+
+    TeachersResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Teacher'
+
+    AddTeacherRequest:
+      type: object
+      required:
+        - Фамилия
+        - Имя
+        - Дисциплина
+      properties:
+        Фамилия:
+          type: string
+          example: "Иванов"
+        Имя:
+          type: string
+          example: "Иван"
+        Отчество:
+          type: string
+          example: "Иванович"
+        Дисциплина:
+          type: string
+          example: "Основы программирования"
+
+    DisciplineInfo:
+      type: object
+      properties:
+        Наименование:
+          type: string
+          example: "Основы программирования"
+        Код:
+          type: string
+          example: "000000001"
+        Преподаватели:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeacherInfo'
+
+    TeacherInfo:
+      type: object
+      properties:
+        Код:
+          type: string
+          example: "000000001"
+        Фамилия:
+          type: string
+          example: "Иванов"
+        Имя:
+          type: string
+          example: "Иван"
+        Отчество:
+          type: string
+          example: "Иванович"
+
+    StudentInfo:
+      type: object
+      properties:
+        Код:
+          type: string
+          example: "000000001"
+        Фамилия:
+          type: string
+          example: "Смирнов"
+        Имя:
+          type: string
+          example: "Алексей"
+        Отчество:
+          type: string
+          example: "Дмитриевич"
+        Группа:
+          type: string
+          example: "ИТ-21"
+        Кафедра:
+          type: string
+          example: "Кафедра информационных технологий"
+
+    Student:
+      type: object
+      properties:
+        Код:
+          type: string
+          example: "000000001"
+        Фамилия:
+          type: string
+          example: "Смирнов"
+        Имя:
+          type: string
+          example: "Алексей"
+        Отчество:
+          type: string
+          example: "Дмитриевич"
+        Кафедра:
+          type: string
+          example: "Кафедра информационных технологий"
+        Группа:
+          type: string
+          example: "ИТ-21"
+        Дисциплины:
+          type: array
+          items:
+            type: string
+          example: ["Основы программирования", "Базы данных"]
+
+    StudentsResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Student'
+
+    StudentFull:
+      type: object
+      properties:
+        Код:
+          type: string
+          example: "000000001"
+        Фамилия:
+          type: string
+          example: "Смирнов"
+        Имя:
+          type: string
+          example: "Алексей"
+        Отчество:
+          type: string
+          example: "Дмитриевич"
+        Кафедра:
+          type: string
+          example: "Кафедра информационных технологий"
+        Группа:
+          type: string
+          example: "ИТ-21"
+        Дисциплины:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisciplineInfo'
+
+    StudentsFullResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentFull'
+
+    StudentFullResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/StudentFull'
+
+    AddStudentRequest:
+      type: object
+      required:
+        - Фамилия
+        - Имя
+        - Кафедра
+      properties:
+        Фамилия:
+          type: string
+          example: "Смирнов"
+        Имя:
+          type: string
+          example: "Алексей"
+        Отчество:
+          type: string
+          example: "Дмитриевич"
+        Кафедра:
+          type: string
+          example: "Кафедра информационных технологий"
+        Группа:
+          type: string
+          example: "ИТ-21"
+        Дисциплины:
+          type: array
+          items:
+            type: string
+          example: ["Основы программирования", "Базы данных"]
+
+    TeacherFull:
+      type: object
+      properties:
+        Код:
+          type: string
+          example: "000000001"
+        Фамилия:
+          type: string
+          example: "Иванов"
+        Имя:
+          type: string
+          example: "Иван"
+        Отчество:
+          type: string
+          example: "Иванович"
+        Дисциплина:
+          type: object
+          properties:
+            Наименование:
+              type: string
+              example: "Основы программирования"
+            Код:
+              type: string
+              example: "000000001"
+        Студенты:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudentInfo'
+
+    TeachersFullResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeacherFull'
+
+    TeacherFullResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/TeacherFull'
+
+    User:
+      type: object
+      properties:
+        Код:
+          type: string
+          example: "000000001"
+        Фамилия:
+          type: string
+          example: "Смирнов"
+        Имя:
+          type: string
+          example: "Алексей"
+        Отчество:
+          type: string
+          example: "Дмитриевич"
+        Принадлежность:
+          type: string
+          enum: [Студент, Преподаватель]
+          example: "Студент"
+
+    UsersResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+
