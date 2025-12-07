@@ -35,6 +35,8 @@ api.interceptors.response.use(
 
 // API методы для аутентификации
 export const authAPI = {
+  checkCode: (data) => api.post('/api/auth/register/check-code', data),
+  getGroups: () => api.get('/api/auth/register/groups'),
   register: (data) => api.post('/api/auth/register', data),
   login: (data) => api.post('/api/auth/login', data),
   getCurrentUser: () => api.get('/api/auth/me'),

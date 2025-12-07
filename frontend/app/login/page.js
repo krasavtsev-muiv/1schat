@@ -40,12 +40,12 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} style={{ marginTop: '2rem' }}>
         {error && <div style={{ color: 'red', marginBottom: '1rem' }}>{error}</div>}
         <div style={{ marginBottom: '1rem' }}>
-          <label>Логин:</label>
+          <label>Логин (код из 1С):</label>
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Введите логин или email"
+            placeholder="Введите логин (например: ИТ-21@Иванов)"
             required
             style={{ width: '100%', padding: '0.5rem', marginTop: '0.5rem' }}
           />
