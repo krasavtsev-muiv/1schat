@@ -140,7 +140,6 @@ class RegistrationService {
                 
                 teacher = await User.create({
                   username: teacherUsername,
-                  email: `${teacherUsername}@temp.local`,
                   password_hash: tempPasswordHash,
                   first_name: teacherData.Имя || '',
                   last_name: teacherData.Фамилия || '',
@@ -170,7 +169,6 @@ class RegistrationService {
 
       const user = await User.create({
         username,
-        email: `${username}@temp.local`, // Временный email для совместимости со схемой
         password_hash,
         first_name: mappedData.first_name,
         last_name: mappedData.last_name,
@@ -272,7 +270,6 @@ class RegistrationService {
 
       const user = await User.create({
         username,
-        email: `${username}@temp.local`, // Временный email для совместимости со схемой
         password_hash,
         first_name: mappedData.first_name,
         last_name: mappedData.last_name,

@@ -180,7 +180,6 @@ class Admin1CService {
         
         teacher = await User.create({
           username,
-          email: `${username}@temp.local`,
           password_hash: tempPasswordHash,
           first_name,
           last_name,
@@ -244,7 +243,6 @@ class Admin1CService {
         
         student = await User.create({
           username,
-          email: `${username}@temp.local`,
           password_hash: tempPasswordHash,
           first_name,
           last_name,

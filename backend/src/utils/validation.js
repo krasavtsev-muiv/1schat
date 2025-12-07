@@ -1,11 +1,5 @@
 // Утилиты для валидации данных
 
-// Валидация email
-const isValidEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
 // Валидация пароля (минимум 6 символов)
 const isValidPassword = (password) => {
   return password && password.length >= 6;
@@ -23,10 +17,6 @@ const validateRegistration = (data) => {
 
   if (!data.username || !isValidUsername(data.username)) {
     errors.push('Имя пользователя должно содержать 3-50 символов (буквы, цифры, подчеркивания)');
-  }
-
-  if (!data.email || !isValidEmail(data.email)) {
-    errors.push('Некорректный email адрес');
   }
 
   if (!data.password || !isValidPassword(data.password)) {
@@ -51,11 +41,9 @@ const validateRegistration = (data) => {
 const validateLogin = (data) => {
   const errors = [];
 
-  // Поддержка входа по username или email
-  const loginField = data.username || data.email;
-  
-  if (!loginField || loginField.trim().length === 0) {
-    errors.push('Логин или email обязателен');
+  // Вход по username (код из 1С)
+  if (!data.username || data.username.trim().length === 0) {
+    errors.push('Логин (код из 1С) обязателен');
   }
 
   if (!data.password || data.password.trim().length === 0) {
@@ -69,7 +57,6 @@ const validateLogin = (data) => {
 };
 
 module.exports = {
-  isValidEmail,
   isValidPassword,
   isValidUsername,
   validateRegistration,

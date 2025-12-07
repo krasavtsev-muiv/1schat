@@ -11,15 +11,6 @@ class User {
     return result.rows[0];
   }
 
-  // Получить пользователя по email
-  static async findByEmail(email) {
-    const result = await query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
-    );
-    return result.rows[0];
-  }
-
   // Получить пользователя по username
   static async findByUsername(username) {
     const result = await query(
@@ -33,7 +24,6 @@ class User {
   static async create(userData) {
     const {
       username,
-      email,
       password_hash,
       first_name,
       last_name,
@@ -49,12 +39,12 @@ class User {
 
     const result = await query(
       `INSERT INTO users (
-        username, email, password_hash, first_name, last_name, middle_name,
+        username, password_hash, first_name, last_name, middle_name,
         phone, role_id, faculty, department, position, student_group, sync_1c_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *`,
       [
-        username, email, password_hash, first_name, last_name, middle_name,
+        username, password_hash, first_name, last_name, middle_name,
         phone, role_id, faculty, department, position, student_group, sync_1c_id
       ]
     );
@@ -115,7 +105,7 @@ class User {
     }
 
     if (filters.search) {
-      sql += ` AND (u.first_name ILIKE $${paramCount} OR u.last_name ILIKE $${paramCount} OR u.email ILIKE $${paramCount})`;
+      sql += ` AND (u.first_name ILIKE $${paramCount} OR u.last_name ILIKE $${paramCount} OR u.username ILIKE $${paramCount})`;
       params.push(`%${filters.search}%`);
       paramCount++;
     }

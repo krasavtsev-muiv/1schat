@@ -132,21 +132,17 @@ const register = async (req, res) => {
 // Вход в систему
 const login = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, password } = req.body;
 
-    // Поддержка входа по username или email (для обратной совместимости)
-    // Но основной способ - по username (код@фамилия или группа@фамилия)
-    const loginField = username || email;
+    // Вход по username (код из 1С: код@фамилия или группа@фамилия)
+    const loginField = username;
     
     if (!loginField || !password) {
       return res.status(400).json({ error: 'Логин и пароль обязательны' });
     }
 
-    // Поиск пользователя по username или email
-    let user = await User.findByUsername(loginField);
-    if (!user) {
-      user = await User.findByEmail(loginField);
-    }
+    // Поиск пользователя по username (код из 1С)
+    const user = await User.findByUsername(loginField);
     
     if (!user) {
       return res.status(401).json({ error: 'Неверный логин или пароль' });
