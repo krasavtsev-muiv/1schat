@@ -6,6 +6,8 @@ const Group = require('../models/group.model');
 const Discipline = require('../models/discipline.model');
 const StudentDiscipline = require('../models/student-discipline.model');
 const TeacherDiscipline = require('../models/teacher-discipline.model');
+const chatService = require('./chat.service');
+const contactService = require('./contact.service');
 const logger = require('../utils/logger');
 
 class RegistrationService {
@@ -184,6 +186,31 @@ class RegistrationService {
         await StudentDiscipline.create(user.user_id, disciplineId);
       }
 
+      // Создание/обновление общегруппового чата
+      let groupChat = null;
+      if (studentData1C.Группа) {
+        groupChat = await chatService.createOrUpdateGroupChat(studentData1C.Группа);
+        await chatService.addUserToGroupChat(groupChat.chat_id, user.user_id);
+      }
+
+      // Добавление в контакты одногруппников
+      let groupmatesAdded = [];
+      if (studentData1C.Группа) {
+        groupmatesAdded = await contactService.addGroupmatesToContacts(
+          user.user_id,
+          studentData1C.Группа
+        );
+      }
+
+      // Добавление в контакты преподавателей по дисциплинам
+      let teachersAdded = [];
+      if (disciplineIds.length > 0) {
+        teachersAdded = await contactService.addTeachersToContacts(
+          user.user_id,
+          disciplineIds
+        );
+      }
+
       return {
         success: true,
         user,
@@ -191,6 +218,11 @@ class RegistrationService {
         group,
         disciplineIds,
         teacherIds: Array.from(teacherIds),
+        groupChat,
+        contactsAdded: {
+          groupmates: groupmatesAdded.length,
+          teachers: teachersAdded.length,
+        },
       };
     } catch (error) {
       logger.error('Ошибка регистрации студента:', error);
@@ -252,12 +284,30 @@ class RegistrationService {
       // Создание связи преподаватель-дисциплина
       if (discipline) {
         await TeacherDiscipline.create(user.user_id, discipline.discipline_id);
+
+        // Добавление в контакты студентов по дисциплине
+        const studentsAdded = await contactService.addStudentsToTeacherContacts(
+          user.user_id,
+          [discipline.discipline_id]
+        );
+
+        return {
+          success: true,
+          user,
+          discipline,
+          contactsAdded: {
+            students: studentsAdded.length,
+          },
+        };
       }
 
       return {
         success: true,
         user,
         discipline,
+        contactsAdded: {
+          students: 0,
+        },
       };
     } catch (error) {
       logger.error('Ошибка регистрации преподавателя:', error);
