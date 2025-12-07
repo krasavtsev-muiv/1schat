@@ -1,111 +1,160 @@
 // Сервис для интеграции с 1С:Предприятие
 const axios = require('axios');
-const User = require('../models/user.model');
-const { query } = require('../../config/database');
+const logger = require('../utils/logger');
 
 class OneCIntegrationService {
   constructor() {
-    this.apiUrl = process.env.ONE_C_API_URL || 'http://localhost:8080/api';
-    this.apiKey = process.env.ONE_C_API_KEY || '';
+    this.apiUrl = process.env.ONE_C_API_URL || 'http://localhost:3040/PD/hs/eis';
+    this.maxRetries = 3;
+    this.retryDelay = 10000; // 10 секунд
   }
 
-  // Получение заголовков для запросов к 1С
-  getHeaders() {
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.apiKey}`,
-    };
+  // Вспомогательный метод для ожидания
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  // Синхронизация пользователей из 1С
-  async syncUsers() {
-    try {
-      const response = await axios.get(`${this.apiUrl}/users`, {
-        headers: this.getHeaders(),
-      });
+  // Базовый метод для выполнения запросов к 1С с обработкой лимитов
+  async makeRequest(endpoint, options = {}) {
+    const { method = 'GET', data = null, params = null } = options;
+    let retryCount = 0;
 
-      const usersFrom1C = response.data.users || [];
-      let synced = 0;
-      let created = 0;
-      let updated = 0;
+    while (retryCount < this.maxRetries) {
+      try {
+        const config = {
+          method,
+          url: `${this.apiUrl}${endpoint}`,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+          },
+          timeout: 30000, // 30 секунд таймаут
+        };
 
-      for (const user1C of usersFrom1C) {
-        try {
-          // Поиск пользователя по sync_1c_id
-          let existingUser = null;
-          if (user1C.id) {
-            const result = await query(
-              'SELECT * FROM users WHERE sync_1c_id = $1',
-              [user1C.id.toString()]
-            );
-            existingUser = result.rows[0];
-          }
-
-          // Определение роли по данным из 1С
-          let roleId = 3; // По умолчанию студент
-          if (user1C.role === 'admin' || user1C.role === 'Администратор') {
-            roleId = 1;
-          } else if (user1C.role === 'manager' || user1C.role === 'Преподаватель') {
-            roleId = 2;
-          }
-
-          const userData = {
-            username: user1C.username || user1C.email,
-            email: user1C.email,
-            first_name: user1C.firstName || user1C.first_name,
-            last_name: user1C.lastName || user1C.last_name,
-            middle_name: user1C.middleName || user1C.middle_name,
-            phone: user1C.phone,
-            role_id: roleId,
-            faculty: user1C.faculty,
-            department: user1C.department,
-            position: user1C.position,
-            student_group: user1C.studentGroup || user1C.student_group,
-            sync_1c_id: user1C.id?.toString(),
-            sync_1c_date: new Date(),
-          };
-
-          if (existingUser) {
-            // Обновление существующего пользователя
-            await User.update(existingUser.user_id, userData);
-            updated++;
-          } else {
-            // Создание нового пользователя (без пароля, нужно будет установить при первом входе)
-            const tempPassword = Math.random().toString(36).slice(-8);
-            const bcrypt = require('bcrypt');
-            userData.password_hash = await bcrypt.hash(tempPassword, 10);
-            await User.create(userData);
-            created++;
-          }
-          synced++;
-        } catch (error) {
-          console.error(`Ошибка синхронизации пользователя ${user1C.id}:`, error);
+        if (data) {
+          config.data = data;
         }
-      }
 
-      return {
-        success: true,
-        synced,
-        created,
-        updated,
-      };
+        if (params) {
+          config.params = params;
+        }
+
+        logger.info(`Запрос к 1С: ${method} ${endpoint}`);
+        const response = await axios(config);
+
+        if (response.data && response.data.success === false) {
+          throw new Error(response.data.error || 'Ошибка от 1С API');
+        }
+
+        return response.data;
+      } catch (error) {
+        const errorMessage = error.response?.data?.error || error.message || '';
+        const errorString = errorMessage.toString();
+
+        // Проверяем на ошибку лимита запросов
+        if (
+          errorString.includes('Training version limitation') ||
+          errorString.includes('Infobase connections limitation') ||
+          errorString.includes('limitation reached')
+        ) {
+          retryCount++;
+          if (retryCount < this.maxRetries) {
+            logger.warn(
+              `Лимит запросов достигнут. Ожидание ${this.retryDelay / 1000} секунд... (попытка ${retryCount}/${this.maxRetries})`
+            );
+            await this.sleep(this.retryDelay);
+            continue;
+          } else {
+            logger.error('Превышено максимальное количество попыток при ошибке лимита запросов');
+            throw new Error('Превышен лимит запросов к 1С. Попробуйте позже.');
+          }
+        }
+
+        // Если это не ошибка лимита, логируем и пробрасываем дальше
+        logger.error(`Ошибка запроса к 1С (${endpoint}):`, errorMessage);
+        throw error;
+      }
+    }
+  }
+
+  // Получение списка групп (для формы регистрации)
+  async getGroups() {
+    try {
+      const response = await this.makeRequest('/Groups');
+      return response.data || [];
     } catch (error) {
-      console.error('Ошибка синхронизации пользователей из 1С:', error);
+      logger.error('Ошибка получения списка групп из 1С:', error);
       throw error;
     }
   }
 
-  // Отправка данных в 1С
-  async sendDataTo1C(endpoint, data) {
+  // Получение студента по коду
+  async getStudentByCode(code) {
     try {
-      const response = await axios.post(
-        `${this.apiUrl}/${endpoint}`,
-        data,
-        { headers: this.getHeaders() }
-      );
-      return response.data;
+      if (!code) {
+        throw new Error('Код студента не указан');
+      }
+      const response = await this.makeRequest(`/StudentsFull/${code}`);
+      return response.data || null;
     } catch (error) {
-      console.error(`Ошибка отправки данных в 1С (${endpoint}):`, error);
+      logger.error(`Ошибка получения студента по коду ${code} из 1С:`, error);
+      throw error;
+    }
+  }
+
+  // Получение преподавателя по коду
+  async getTeacherByCode(code) {
+    try {
+      if (!code) {
+        throw new Error('Код преподавателя не указан');
+      }
+      const response = await this.makeRequest(`/TeachersFull/${code}`);
+      return response.data || null;
+    } catch (error) {
+      logger.error(`Ошибка получения преподавателя по коду ${code} из 1С:`, error);
+      throw error;
+    }
+  }
+
+  // Получение списка кафедр
+  async getDepartments() {
+    try {
+      const response = await this.makeRequest('/Departments');
+      return response.data || [];
+    } catch (error) {
+      logger.error('Ошибка получения списка кафедр из 1С:', error);
+      throw error;
+    }
+  }
+
+  // Получение списка дисциплин
+  async getDisciplines() {
+    try {
+      const response = await this.makeRequest('/Disciplines');
+      return response.data || [];
+    } catch (error) {
+      logger.error('Ошибка получения списка дисциплин из 1С:', error);
+      throw error;
+    }
+  }
+
+  // Получение списка преподавателей
+  async getTeachers() {
+    try {
+      const response = await this.makeRequest('/Teachers');
+      return response.data || [];
+    } catch (error) {
+      logger.error('Ошибка получения списка преподавателей из 1С:', error);
+      throw error;
+    }
+  }
+
+  // Получение списка студентов
+  async getStudents() {
+    try {
+      const response = await this.makeRequest('/Students');
+      return response.data || [];
+    } catch (error) {
+      logger.error('Ошибка получения списка студентов из 1С:', error);
       throw error;
     }
   }
@@ -113,16 +162,60 @@ class OneCIntegrationService {
   // Проверка подключения к 1С
   async checkConnection() {
     try {
-      const response = await axios.get(`${this.apiUrl}/health`, {
-        headers: this.getHeaders(),
-        timeout: 5000,
-      });
-      return { connected: true, response: response.data };
+      const response = await this.makeRequest('/Departments');
+      return { connected: true, message: 'Подключение к 1С установлено' };
     } catch (error) {
-      return { connected: false, error: error.message };
+      logger.error('Ошибка проверки подключения к 1С:', error);
+      return {
+        connected: false,
+        error: error.message || 'Не удалось подключиться к 1С',
+      };
     }
+  }
+
+  // Маппинг данных студента из 1С в формат локальной БД
+  map1CStudentToLocalUser(student1C) {
+    if (!student1C) {
+      return null;
+    }
+
+    const username = student1C.Группа
+      ? `${student1C.Группа}@${student1C.Фамилия}`
+      : `${student1C.Код}@${student1C.Фамилия}`;
+
+    return {
+      sync_1c_id: student1C.Код?.toString(),
+      username: username,
+      last_name: student1C.Фамилия || '',
+      first_name: student1C.Имя || '',
+      middle_name: student1C.Отчество || null,
+      department: student1C.Кафедра || null,
+      student_group: student1C.Группа || null,
+      role_id: 3, // student
+      disciplines: student1C.Дисциплины || [],
+    };
+  }
+
+  // Маппинг данных преподавателя из 1С в формат локальной БД
+  map1CTeacherToLocalUser(teacher1C) {
+    if (!teacher1C) {
+      return null;
+    }
+
+    // Для преподавателя username формируется из кода и фамилии
+    const username = `${teacher1C.Код}@${teacher1C.Фамилия}`;
+
+    return {
+      sync_1c_id: teacher1C.Код?.toString(),
+      username: username,
+      last_name: teacher1C.Фамилия || '',
+      first_name: teacher1C.Имя || '',
+      middle_name: teacher1C.Отчество || null,
+      role_id: 2, // manager (преподаватель)
+      discipline: teacher1C.Дисциплина || null,
+      students: teacher1C.Студенты || [],
+    };
   }
 }
 
 module.exports = new OneCIntegrationService();
-
