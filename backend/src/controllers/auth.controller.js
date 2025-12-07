@@ -5,6 +5,7 @@ const { generateToken, getTokenExpiration } = require('../utils/jwt.util');
 const { hashPassword, comparePassword } = require('../utils/password.util');
 const registrationService = require('../services/registration.service');
 const oneCService = require('../services/1c-integration.service');
+const userUpdateService = require('../services/user-update.service');
 const logger = require('../utils/logger');
 
 // Проверка кода пользователя в 1С (для регистрации)
@@ -133,11 +134,12 @@ const login = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    // Поддержка входа по username или email
+    // Поддержка входа по username или email (для обратной совместимости)
+    // Но основной способ - по username (код@фамилия или группа@фамилия)
     const loginField = username || email;
     
     if (!loginField || !password) {
-      return res.status(400).json({ error: 'Логин (или email) и пароль обязательны' });
+      return res.status(400).json({ error: 'Логин и пароль обязательны' });
     }
 
     // Поиск пользователя по username или email
@@ -147,18 +149,44 @@ const login = async (req, res) => {
     }
     
     if (!user) {
-      return res.status(401).json({ error: 'Неверный логин (или email) или пароль' });
+      return res.status(401).json({ error: 'Неверный логин или пароль' });
     }
 
     // Проверка пароля
     const isPasswordValid = await comparePassword(password, user.password_hash);
     if (!isPasswordValid) {
-      return res.status(401).json({ error: 'Неверный логин (или email) или пароль' });
+      return res.status(401).json({ error: 'Неверный логин или пароль' });
     }
 
     // Проверка активности пользователя
     if (!user.is_active) {
       return res.status(403).json({ error: 'Аккаунт деактивирован' });
+    }
+
+    // Синхронизация данных из 1С (только если не администратор)
+    if (user.role_id !== 1 && user.sync_1c_id) {
+      try {
+        if (user.role_id === 3) {
+          // Студент
+          const studentData = await oneCService.getStudentByCode(user.sync_1c_id);
+          if (studentData) {
+            await userUpdateService.updateStudentData(user.user_id, studentData);
+            // Обновляем данные пользователя после синхронизации
+            user = await User.findById(user.user_id);
+          }
+        } else if (user.role_id === 2) {
+          // Преподаватель
+          const teacherData = await oneCService.getTeacherByCode(user.sync_1c_id);
+          if (teacherData) {
+            await userUpdateService.updateTeacherData(user.user_id, teacherData);
+            // Обновляем данные пользователя после синхронизации
+            user = await User.findById(user.user_id);
+          }
+        }
+      } catch (syncError) {
+        logger.error('Ошибка синхронизации данных из 1С при авторизации:', syncError);
+        // Не прерываем процесс входа при ошибке синхронизации
+      }
     }
 
     // Обновление времени последнего онлайна

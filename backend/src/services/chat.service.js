@@ -4,6 +4,9 @@ const User = require('../models/user.model');
 const { query } = require('../../config/database');
 const logger = require('../utils/logger');
 
+// Импортируем query для использования в методах
+const getQuery = () => require('../../config/database').query;
+
 class ChatService {
   // Создать или получить существующий общегрупповой чат
   async createOrUpdateGroupChat(groupName) {
@@ -44,6 +47,23 @@ class ChatService {
       logger.info(`Пользователь ${userId} добавлен в групповой чат ${chatId}`);
     } catch (error) {
       logger.error(`Ошибка добавления пользователя ${userId} в чат ${chatId}:`, error);
+      throw error;
+    }
+  }
+
+  // Удалить пользователя из группового чата (пометить left_at)
+  async removeUserFromGroupChat(chatId, userId) {
+    try {
+      const { query } = require('../../config/database');
+      await query(
+        `UPDATE chat_participants 
+         SET left_at = CURRENT_TIMESTAMP 
+         WHERE chat_id = $1 AND user_id = $2`,
+        [chatId, userId]
+      );
+      logger.info(`Пользователь ${userId} удалён из группового чата ${chatId}`);
+    } catch (error) {
+      logger.error(`Ошибка удаления пользователя ${userId} из чата ${chatId}:`, error);
       throw error;
     }
   }
