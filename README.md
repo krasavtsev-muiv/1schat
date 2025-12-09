@@ -16,54 +16,81 @@
 app/
 ├── backend/          # Express API сервер
 ├── frontend/         # Next.js приложение
-├── database/         # SQL схемы и миграции
+├── database/         # SQL схемы и начальные данные
+│   ├── schema.sql    # Полная схема БД (актуальная, выполняется автоматически)
+│   └── seeds.sql     # Начальные данные
 ├── 1scfg/           # Конфигурация и документация интеграции с 1С
 └── docs/            # Документация
 ```
+
+## Быстрый старт
+
+1. Запустите базу данных в Docker:
+```bash
+docker-compose up -d postgres
+```
+
+2. Настройте переменные окружения (см. раздел ниже)
+
+3. Запустите backend и frontend (см. разделы ниже)
 
 ## Установка и запуск
 
 ### Требования
 
 - Node.js 16+
-- PostgreSQL 12+
+- Docker и Docker Compose
 - 1С:Предприятие (учебная версия) с настроенным HTTP-сервисом
 
 ### Настройка переменных окружения
 
-Создайте файл `.env` в корне проекта на основе `.env.example`:
-
-```bash
-cp .env.example .env
-```
+Создайте файл `.env` в корне проекта:
 
 Отредактируйте `.env` и укажите:
-- Параметры подключения к PostgreSQL
+- Параметры подключения к PostgreSQL (по умолчанию для Docker):
+  - `DB_HOST=localhost` (или `postgres` при запуске backend в Docker)
+  - `DB_PORT=5432`
+  - `DB_NAME=chat_service_db`
+  - `DB_USER=postgres`
+  - `DB_PASSWORD=postgres`
 - JWT_SECRET (измените на случайный ключ)
 - ONE_C_API_URL (URL вашего HTTP-сервиса 1С)
 
-### База данных
+### База данных (Docker)
 
-1. Создайте базу данных PostgreSQL:
-```sql
-CREATE DATABASE chat_service_db;
-```
+База данных запускается в отдельном Docker-контейнере:
 
-2. Выполните схему:
+1. Запустите контейнер PostgreSQL:
 ```bash
-psql -U postgres -d chat_service_db -f database/schema.sql
+docker-compose up -d postgres
 ```
 
-3. Выполните миграции:
+2. База данных будет автоматически инициализирована:
+   - Схема `database/schema.sql` выполнится автоматически при первом запуске
+   - Начальные данные из `database/seeds.sql` загрузятся автоматически
+   - Данные сохраняются в Docker volume `postgres_data`
+
+3. Проверьте статус контейнера:
 ```bash
-psql -U postgres -d chat_service_db -f database/migrations/001_add_1c_tables.sql
-psql -U postgres -d chat_service_db -f database/migrations/002_update_users_email_nullable.sql
+docker-compose ps
 ```
 
-4. Загрузите начальные данные:
+4. Для просмотра логов:
 ```bash
-psql -U postgres -d chat_service_db -f database/seeds.sql
+docker-compose logs postgres
 ```
+
+5. Для остановки базы данных:
+```bash
+docker-compose stop postgres
+```
+
+6. Для полного удаления (включая данные):
+```bash
+docker-compose down -v
+```
+
+**Примечание**: При первом запуске контейнер автоматически создаст базу данных и выполнит схему. Миграции не требуются, так как `schema.sql` уже содержит все необходимые таблицы.
 
 ### Backend
 
@@ -74,6 +101,11 @@ npm run dev
 ```
 
 Сервер запустится на `http://localhost:3001`
+
+**Важно**: Убедитесь, что контейнер PostgreSQL запущен перед запуском backend:
+```bash
+docker-compose up -d postgres
+```
 
 ### Frontend
 
@@ -143,7 +175,6 @@ npm run dev
 
 ## Документация
 
-- [План интеграции с 1С](docs/1C_INTEGRATION_PLAN.md)
 - [API документация 1С](1scfg/api-docs/API_README.md)
 - [OpenAPI спецификация](1scfg/api-docs/openapi.yaml)
 
