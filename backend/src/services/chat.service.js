@@ -73,7 +73,8 @@ class ChatService {
     try {
       const result = await query(
         `SELECT u.* FROM users u 
-         WHERE u.student_group = $1 AND u.role_id = 3 AND u.is_active = true
+         JOIN roles r ON u.role_id = r.role_id
+         WHERE u.student_group = $1 AND r.role_name = 'student' AND u.is_active = true
          ORDER BY u.last_name, u.first_name`,
         [groupName]
       );

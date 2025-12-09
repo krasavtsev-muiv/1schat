@@ -37,6 +37,12 @@ class RegistrationService {
       };
     } catch (error) {
       logger.error(`Ошибка проверки кода студента ${code}:`, error);
+      
+      // Пробрасываем ошибку лимита дальше без обработки
+      if (error.isLimitError || error.message === 'LIMIT_REACHED') {
+        throw error;
+      }
+      
       return {
         valid: false,
         error: error.message || 'Ошибка при проверке кода в системе 1С',
@@ -62,6 +68,11 @@ class RegistrationService {
       };
     } catch (error) {
       logger.error(`Ошибка проверки кода преподавателя ${code}:`, error);
+      
+      // Пробрасываем ошибку лимита дальше без обработки
+      if (error.isLimitError || error.message === 'LIMIT_REACHED') {
+        throw error;
+      }
       return {
         valid: false,
         error: error.message || 'Ошибка при проверке кода в системе 1С',
@@ -70,7 +81,7 @@ class RegistrationService {
   }
 
   // Регистрация студента
-  async registerStudent(studentData1C, password) {
+  async registerStudent(studentData1C, password, username) {
     try {
       const mappedData = oneCService.map1CStudentToLocalUser(studentData1C);
       
@@ -78,10 +89,43 @@ class RegistrationService {
         throw new Error('Не удалось обработать данные студента из 1С');
       }
 
-      // Проверка существования пользователя
-      const existingUser = await User.findByUsername(mappedData.username);
+      if (!username || username.trim() === '') {
+        throw new Error('Логин обязателен для заполнения');
+      }
+
+      // Проверка существования пользователя по username
+      const existingUser = await User.findByUsername(username.trim());
       if (existingUser) {
-        throw new Error('Пользователь с таким username уже существует');
+        throw new Error('Пользователь с таким логином уже существует');
+      }
+
+      // Проверка существования пользователя по sync_1c_id
+      if (mappedData.sync_1c_id) {
+        const { query } = require('../../config/database');
+        const existingByCode = await query(
+          'SELECT * FROM users WHERE sync_1c_id = $1',
+          [mappedData.sync_1c_id]
+        );
+        if (existingByCode.rows.length > 0) {
+          const existing = existingByCode.rows[0];
+          // Если пользователь существует но без username, обновляем его
+          if (!existing.username) {
+            // Обновляем username, пароль и активируем пользователя
+            const { hashPassword } = require('../utils/password.util');
+            const password_hash = await hashPassword(password);
+            await User.update(existing.user_id, { 
+              username: username.trim(),
+              password_hash,
+              is_active: true  // Активируем пользователя при регистрации
+            });
+            return {
+              success: true,
+              user: await User.findById(existing.user_id),
+            };
+          } else {
+            throw new Error('Пользователь с таким кодом уже зарегистрирован');
+          }
+        }
       }
 
       // Создание/получение кафедры
@@ -128,23 +172,33 @@ class RegistrationService {
                 Дисциплина: disciplineData.Наименование || disciplineData,
               });
 
-              // Проверяем существование преподавателя
-              const teacherUsername = `${teacherData.Код}@${teacherData.Фамилия}`;
-              let teacher = await User.findByUsername(teacherUsername);
+              // Проверяем существование преподавателя по sync_1c_id
+              let teacher = null;
+              if (teacherData.Код) {
+                const { query } = require('../../config/database');
+                const teacherResult = await query(
+                  'SELECT * FROM users WHERE sync_1c_id = $1',
+                  [teacherData.Код.toString()]
+                );
+                if (teacherResult.rows.length > 0) {
+                  teacher = teacherResult.rows[0];
+                }
+              }
+              
               if (!teacher) {
-                // Преподаватель ещё не зарегистрирован, создаём запись без пароля
-                // Пароль будет установлен при регистрации преподавателя
+                // Преподаватель ещё не зарегистрирован, создаём запись без username и пароля
+                // Username и пароль будут установлены при регистрации преподавателя
                 // Используем временный пароль для возможности создания записи
                 const { hashPassword } = require('../utils/password.util');
                 const tempPasswordHash = await hashPassword('temp_' + teacherData.Код);
                 
                 teacher = await User.create({
-                  username: teacherUsername,
+                  username: null, // Username будет установлен при регистрации
                   password_hash: tempPasswordHash,
                   first_name: teacherData.Имя || '',
                   last_name: teacherData.Фамилия || '',
                   middle_name: teacherData.Отчество || null,
-                  role_id: 2, // manager
+                  role_id: 2, // teacher
                   sync_1c_id: teacherData.Код?.toString(),
                 });
               }
@@ -162,13 +216,8 @@ class RegistrationService {
       const { hashPassword } = require('../utils/password.util');
       const password_hash = await hashPassword(password);
 
-      // Формируем username: группа@фамилия
-      const username = studentData1C.Группа
-        ? `${studentData1C.Группа}@${studentData1C.Фамилия}`
-        : `${studentData1C.Код}@${studentData1C.Фамилия}`;
-
       const user = await User.create({
-        username,
+        username: username.trim(),
         password_hash,
         first_name: mappedData.first_name,
         last_name: mappedData.last_name,
@@ -184,30 +233,15 @@ class RegistrationService {
         await StudentDiscipline.create(user.user_id, disciplineId);
       }
 
-      // Создание/обновление общегруппового чата
+      // Создание/обновление общегруппового чата (только групповой чат, не приватные)
       let groupChat = null;
       if (studentData1C.Группа) {
         groupChat = await chatService.createOrUpdateGroupChat(studentData1C.Группа);
         await chatService.addUserToGroupChat(groupChat.chat_id, user.user_id);
       }
 
-      // Добавление в контакты одногруппников
-      let groupmatesAdded = [];
-      if (studentData1C.Группа) {
-        groupmatesAdded = await contactService.addGroupmatesToContacts(
-          user.user_id,
-          studentData1C.Группа
-        );
-      }
-
-      // Добавление в контакты преподавателей по дисциплинам
-      let teachersAdded = [];
-      if (disciplineIds.length > 0) {
-        teachersAdded = await contactService.addTeachersToContacts(
-          user.user_id,
-          disciplineIds
-        );
-      }
+      // Примечание: Приватные чаты с конкретными пользователями НЕ создаются автоматически
+      // Пользователь сам выбирает с кем начать чат из списка контактов
 
       return {
         success: true,
@@ -217,10 +251,6 @@ class RegistrationService {
         disciplineIds,
         teacherIds: Array.from(teacherIds),
         groupChat,
-        contactsAdded: {
-          groupmates: groupmatesAdded.length,
-          teachers: teachersAdded.length,
-        },
       };
     } catch (error) {
       logger.error('Ошибка регистрации студента:', error);
@@ -229,7 +259,7 @@ class RegistrationService {
   }
 
   // Регистрация преподавателя
-  async registerTeacher(teacherData1C, password) {
+  async registerTeacher(teacherData1C, password, username) {
     try {
       const mappedData = oneCService.map1CTeacherToLocalUser(teacherData1C);
       
@@ -237,10 +267,43 @@ class RegistrationService {
         throw new Error('Не удалось обработать данные преподавателя из 1С');
       }
 
-      // Проверка существования пользователя
-      const existingUser = await User.findByUsername(mappedData.username);
+      if (!username || username.trim() === '') {
+        throw new Error('Логин обязателен для заполнения');
+      }
+
+      // Проверка существования пользователя по username
+      const existingUser = await User.findByUsername(username.trim());
       if (existingUser) {
-        throw new Error('Пользователь с таким username уже существует');
+        throw new Error('Пользователь с таким логином уже существует');
+      }
+
+      // Проверка существования пользователя по sync_1c_id
+      if (mappedData.sync_1c_id) {
+        const { query } = require('../../config/database');
+        const existingByCode = await query(
+          'SELECT * FROM users WHERE sync_1c_id = $1',
+          [mappedData.sync_1c_id]
+        );
+        if (existingByCode.rows.length > 0) {
+          const existing = existingByCode.rows[0];
+          // Если пользователь существует но без username, обновляем его
+          if (!existing.username) {
+            // Обновляем username, пароль и активируем пользователя
+            const { hashPassword } = require('../utils/password.util');
+            const password_hash = await hashPassword(password);
+            await User.update(existing.user_id, { 
+              username: username.trim(),
+              password_hash,
+              is_active: true  // Активируем пользователя при регистрации
+            });
+            return {
+              success: true,
+              user: await User.findById(existing.user_id),
+            };
+          } else {
+            throw new Error('Пользователь с таким кодом уже зарегистрирован');
+          }
+        }
       }
 
       // Создание/получение дисциплины
@@ -265,16 +328,13 @@ class RegistrationService {
       const { hashPassword } = require('../utils/password.util');
       const password_hash = await hashPassword(password);
 
-      // Формируем username: код@фамилия
-      const username = `${teacherData1C.Код}@${teacherData1C.Фамилия}`;
-
       const user = await User.create({
-        username,
+        username: username.trim(),
         password_hash,
         first_name: mappedData.first_name,
         last_name: mappedData.last_name,
         middle_name: mappedData.middle_name,
-        role_id: 2, // manager (преподаватель)
+        role_id: 2, // teacher (преподаватель)
         sync_1c_id: mappedData.sync_1c_id,
       });
 
@@ -282,19 +342,13 @@ class RegistrationService {
       if (discipline) {
         await TeacherDiscipline.create(user.user_id, discipline.discipline_id);
 
-        // Добавление в контакты студентов по дисциплине
-        const studentsAdded = await contactService.addStudentsToTeacherContacts(
-          user.user_id,
-          [discipline.discipline_id]
-        );
+        // Примечание: Приватные чаты с конкретными пользователями НЕ создаются автоматически
+        // Пользователь сам выбирает с кем начать чат из списка контактов
 
         return {
           success: true,
           user,
           discipline,
-          contactsAdded: {
-            students: studentsAdded.length,
-          },
         };
       }
 

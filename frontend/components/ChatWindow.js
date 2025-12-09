@@ -69,13 +69,24 @@ export default function ChatWindow({ chat }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Функция для получения отображаемого имени чата (такая же как в ChatList)
+  const getChatDisplayName = (chat) => {
+    if (chat.chat_type === 'private' && chat.other_participant) {
+      // Для приватных чатов показываем имя собеседника
+      const other = chat.other_participant;
+      return `${other.first_name} ${other.last_name}`.trim();
+    }
+    // Для групповых чатов показываем название чата
+    return chat.chat_name || 'Без названия';
+  };
+
   if (!chat) return <div>Выберите чат</div>;
   if (loading) return <div>Загрузка сообщений...</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '1rem', borderBottom: '1px solid #dee2e6' }}>
-        <h3>{chat.chat_name || 'Чат'}</h3>
+        <h3>{getChatDisplayName(chat)}</h3>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
         {messages.map((msg) => {

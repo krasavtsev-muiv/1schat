@@ -109,9 +109,10 @@ class ContactService {
         `SELECT DISTINCT u.user_id, u.first_name, u.last_name, u.middle_name, u.student_group
          FROM users u
          JOIN student_disciplines sd ON u.user_id = sd.user_id
+         JOIN roles r ON u.role_id = r.role_id
          WHERE sd.discipline_id = ANY($1::int[])
          AND u.user_id != $2
-         AND u.role_id = 3
+         AND r.role_name = 'student'
          AND u.is_active = true`,
         [disciplineIds, studentId]
       );

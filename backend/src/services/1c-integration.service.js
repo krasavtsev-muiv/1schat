@@ -49,28 +49,52 @@ class OneCIntegrationService {
       } catch (error) {
         const errorMessage = error.response?.data?.error || error.message || '';
         const errorString = errorMessage.toString();
+        const statusCode = error.response?.status;
+        const responseData = error.response?.data;
+        
+        // Проверяем текст ответа (может быть строка, объект или HTML)
+        let responseText = '';
+        if (typeof responseData === 'string') {
+          responseText = responseData;
+        } else if (responseData && typeof responseData === 'object') {
+          responseText = JSON.stringify(responseData);
+        }
+        
+        // Объединяем все возможные тексты ошибки для проверки
+        const fullErrorText = `${errorString} ${responseText}`.toLowerCase();
 
         // Проверяем на ошибку лимита запросов
-        if (
-          errorString.includes('Training version limitation') ||
-          errorString.includes('Infobase connections limitation') ||
-          errorString.includes('limitation reached')
-        ) {
+        // Учебная версия 1С возвращает статус 500 с текстом:
+        // "Training version limitation reached\nInfobase connections limitation reached"
+        const isLimitError = 
+          statusCode === 500 && (
+            fullErrorText.includes('training version limitation reached') ||
+            fullErrorText.includes('infobase connections limitation reached') ||
+            fullErrorText.includes('training version limitation') ||
+            fullErrorText.includes('infobase connections limitation') ||
+            fullErrorText.includes('limitation reached')
+          );
+
+        if (isLimitError) {
           retryCount++;
           if (retryCount < this.maxRetries) {
             logger.warn(
-              `Лимит запросов достигнут. Ожидание ${this.retryDelay / 1000} секунд... (попытка ${retryCount}/${this.maxRetries})`
+              `Лимит запросов к 1С достигнут (статус: ${statusCode}). Ожидание ${this.retryDelay / 1000} секунд... (попытка ${retryCount}/${this.maxRetries})`
             );
             await this.sleep(this.retryDelay);
             continue;
           } else {
             logger.error('Превышено максимальное количество попыток при ошибке лимита запросов');
-            throw new Error('Превышен лимит запросов к 1С. Попробуйте позже.');
+            // Создаем специальную ошибку для фронтенда
+            const limitError = new Error('LIMIT_REACHED');
+            limitError.isLimitError = true;
+            limitError.retryAfter = this.retryDelay / 1000;
+            throw limitError;
           }
         }
 
         // Если это не ошибка лимита, логируем и пробрасываем дальше
-        logger.error(`Ошибка запроса к 1С (${endpoint}):`, errorMessage);
+        logger.error(`Ошибка запроса к 1С (${endpoint}):`, errorMessage || errorString);
         throw error;
       }
     }
@@ -211,7 +235,7 @@ class OneCIntegrationService {
       last_name: teacher1C.Фамилия || '',
       first_name: teacher1C.Имя || '',
       middle_name: teacher1C.Отчество || null,
-      role_id: 2, // manager (преподаватель)
+      role_id: 2, // teacher (преподаватель)
       discipline: teacher1C.Дисциплина || null,
       students: teacher1C.Студенты || [],
     };

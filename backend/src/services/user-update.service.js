@@ -20,7 +20,7 @@ class UserUpdateService {
         throw new Error('Пользователь не найден');
       }
 
-      if (user.role_id !== 3) {
+      if (user.role_name !== 'student') {
         throw new Error('Пользователь не является студентом');
       }
 
@@ -35,7 +35,6 @@ class UserUpdateService {
         middle_name: studentData1C.Отчество || user.middle_name,
         department: studentData1C.Кафедра || user.department,
         student_group: newGroup,
-        sync_1c_date: new Date(),
       });
 
       // Обновляем связи студент-дисциплина
@@ -65,12 +64,21 @@ class UserUpdateService {
       // Обновляем связи студент-дисциплина
       await StudentDiscipline.updateStudentDisciplines(userId, newDisciplineIds);
 
-      // Обновляем чаты и контакты если группа изменилась
-      if (oldGroup !== newGroup && newGroup) {
-        await this.updateStudentConnections(userId, oldGroup, newGroup, newDisciplineIds);
-      } else if (newGroup) {
-        // Группа не изменилась, но нужно обновить контакты по дисциплинам
-        await this.updateStudentContactsByDisciplines(userId, newDisciplineIds);
+      // Обновляем только групповой чат если группа изменилась
+      // Приватные чаты с конкретными пользователями НЕ создаются автоматически
+      if (oldGroup !== newGroup) {
+        // Удаляем из старого группового чата
+        if (oldGroup) {
+          const oldGroupChat = await chatService.createOrUpdateGroupChat(oldGroup);
+          if (oldGroupChat) {
+            await chatService.removeUserFromGroupChat(oldGroupChat.chat_id, userId);
+          }
+        }
+        // Добавляем в новый групповой чат
+        if (newGroup) {
+          const newGroupChat = await chatService.createOrUpdateGroupChat(newGroup);
+          await chatService.addUserToGroupChat(newGroupChat.chat_id, userId);
+        }
       }
 
       logger.info(`Данные студента ${userId} обновлены из 1С`);
@@ -89,7 +97,7 @@ class UserUpdateService {
         throw new Error('Пользователь не найден');
       }
 
-      if (user.role_id !== 2) {
+      if (user.role_name !== 'teacher') {
         throw new Error('Пользователь не является преподавателем');
       }
 
@@ -98,7 +106,6 @@ class UserUpdateService {
         first_name: teacherData1C.Имя || user.first_name,
         last_name: teacherData1C.Фамилия || user.last_name,
         middle_name: teacherData1C.Отчество || user.middle_name,
-        sync_1c_date: new Date(),
       });
 
       // Обновляем связи преподаватель-дисциплина
@@ -124,10 +131,8 @@ class UserUpdateService {
       // Обновляем связи преподаватель-дисциплина
       await TeacherDiscipline.updateTeacherDisciplines(userId, newDisciplineIds);
 
-      // Обновляем контакты преподавателя
-      if (newDisciplineIds.length > 0) {
-        await this.updateTeacherContacts(userId, newDisciplineIds);
-      }
+      // Примечание: Приватные чаты с конкретными пользователями НЕ создаются автоматически
+      // Пользователь сам выбирает с кем начать чат из списка контактов
 
       logger.info(`Данные преподавателя ${userId} обновлены из 1С`);
       return { success: true };
@@ -137,104 +142,9 @@ class UserUpdateService {
     }
   }
 
-  // Обновление связей студента при смене группы
-  async updateStudentConnections(userId, oldGroup, newGroup, newDisciplineIds) {
-    try {
-      // Удаляем из старого группового чата
-      if (oldGroup) {
-        const oldGroupChat = await chatService.createOrUpdateGroupChat(oldGroup);
-        if (oldGroupChat) {
-          // Помечаем, что пользователь вышел из чата
-          await chatService.removeUserFromGroupChat(oldGroupChat.chat_id, userId);
-        }
-      }
-
-      // Добавляем в новый групповой чат
-      if (newGroup) {
-        const newGroupChat = await chatService.createOrUpdateGroupChat(newGroup);
-        await chatService.addUserToGroupChat(newGroupChat.chat_id, userId);
-      }
-
-      // Обновляем контакты
-      await this.updateStudentContacts(userId, oldGroup, newGroup, newDisciplineIds);
-
-      logger.info(`Связи студента ${userId} обновлены: группа ${oldGroup} -> ${newGroup}`);
-    } catch (error) {
-      logger.error(`Ошибка обновления связей студента ${userId}:`, error);
-      throw error;
-    }
-  }
-
-  // Обновление контактов студента
-  async updateStudentContacts(userId, oldGroup, newGroup, newDisciplineIds) {
-    try {
-      // Находим студентов с пересечениями по предметам (сохраняем)
-      const studentsWithCommonDisciplines = await contactService.findStudentsWithCommonDisciplines(userId);
-      const keepContactIds = new Set(studentsWithCommonDisciplines.map(s => s.user_id));
-
-      // Получаем все текущие контакты пользователя (через приватные чаты)
-      const currentContacts = await this.getUserContacts(userId);
-
-      // Удаляем контакты, которые не соответствуют новым данным
-      for (const contactId of currentContacts) {
-        if (!keepContactIds.has(contactId)) {
-          await contactService.removeContact(userId, contactId);
-        }
-      }
-
-      // Добавляем одногруппников из новой группы
-      if (newGroup) {
-        await contactService.addGroupmatesToContacts(userId, newGroup);
-      }
-
-      // Добавляем преподавателей по новым дисциплинам
-      if (newDisciplineIds.length > 0) {
-        await contactService.addTeachersToContacts(userId, newDisciplineIds);
-      }
-
-      logger.info(`Контакты студента ${userId} обновлены`);
-    } catch (error) {
-      logger.error(`Ошибка обновления контактов студента ${userId}:`, error);
-      throw error;
-    }
-  }
-
-  // Обновление контактов студента только по дисциплинам (группа не изменилась)
-  async updateStudentContactsByDisciplines(userId, newDisciplineIds) {
-    try {
-      // Находим студентов с пересечениями по предметам (сохраняем)
-      const studentsWithCommonDisciplines = await contactService.findStudentsWithCommonDisciplines(userId);
-      const keepContactIds = new Set(studentsWithCommonDisciplines.map(s => s.user_id));
-
-      // Получаем все текущие контакты пользователя
-      const currentContacts = await this.getUserContacts(userId);
-
-      // Удаляем контакты преподавателей, которые не соответствуют новым дисциплинам
-      for (const contactId of currentContacts) {
-        const contact = await User.findById(contactId);
-        if (contact && contact.role_id === 2) {
-          // Это преподаватель, проверяем его дисциплины
-          const teacherDisciplines = await TeacherDiscipline.findByTeacherId(contactId);
-          const teacherDisciplineIds = teacherDisciplines.map(td => td.discipline_id);
-          
-          const hasCommonDiscipline = newDisciplineIds.some(id => teacherDisciplineIds.includes(id));
-          if (!hasCommonDiscipline && !keepContactIds.has(contactId)) {
-            await contactService.removeContact(userId, contactId);
-          }
-        }
-      }
-
-      // Добавляем преподавателей по новым дисциплинам
-      if (newDisciplineIds.length > 0) {
-        await contactService.addTeachersToContacts(userId, newDisciplineIds);
-      }
-
-      logger.info(`Контакты студента ${userId} обновлены по дисциплинам`);
-    } catch (error) {
-      logger.error(`Ошибка обновления контактов студента ${userId} по дисциплинам:`, error);
-      throw error;
-    }
-  }
+  // Примечание: Методы updateStudentConnections, updateStudentContacts, updateStudentContactsByDisciplines
+  // больше не используются, так как приватные чаты не создаются автоматически
+  // Оставлены для совместимости, но не вызываются
 
   // Обновление контактов преподавателя
   async updateTeacherContacts(teacherId, newDisciplineIds) {
@@ -254,7 +164,7 @@ class UserUpdateService {
       // Удаляем контакты со студентами, которые не соответствуют новым дисциплинам
       for (const contactId of currentContacts) {
         const contact = await User.findById(contactId);
-        if (contact && contact.role_id === 3) {
+        if (contact && contact.role_name === 'student') {
           // Это студент
           if (!newStudentIds.has(contactId)) {
             await contactService.removeContact(teacherId, contactId);

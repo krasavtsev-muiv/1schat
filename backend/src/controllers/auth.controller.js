@@ -7,6 +7,7 @@ const registrationService = require('../services/registration.service');
 const oneCService = require('../services/1c-integration.service');
 const userUpdateService = require('../services/user-update.service');
 const logger = require('../utils/logger');
+const { handle1CError } = require('../utils/1c-error-handler');
 
 // Проверка кода пользователя в 1С (для регистрации)
 const checkCode = async (req, res) => {
@@ -54,7 +55,15 @@ const checkCode = async (req, res) => {
     }
   } catch (error) {
     logger.error('Ошибка проверки кода:', error);
-    res.status(500).json({ error: 'Ошибка при проверке кода' });
+    
+    // Обрабатываем ошибку лимита запросов
+    if (handle1CError(error, res, 'Ошибка при проверке кода в системе 1С')) {
+      return;
+    }
+    
+    res.status(500).json({ 
+      error: error.message || 'Ошибка при проверке кода в системе 1С' 
+    });
   }
 };
 
@@ -68,9 +77,15 @@ const getGroups = async (req, res) => {
     });
   } catch (error) {
     logger.error('Ошибка получения групп из 1С:', error);
+    
+    // Обрабатываем ошибку лимита запросов
+    if (handle1CError(error, res, 'Ошибка при получении групп из системы 1С')) {
+      return;
+    }
+    
     res.status(500).json({
       success: false,
-      error: error.message || 'Ошибка при получении групп',
+      error: error.message || 'Ошибка при получении групп из системы 1С',
     });
   }
 };
@@ -78,10 +93,22 @@ const getGroups = async (req, res) => {
 // Регистрация нового пользователя с данными из 1С
 const register = async (req, res) => {
   try {
-    const { code, role, password, group } = req.body;
+    const { code, role, password, username, group } = req.body;
 
     if (!code || !role || !password) {
       return res.status(400).json({ error: 'Код, роль и пароль обязательны' });
+    }
+
+    if (!username || username.trim() === '') {
+      return res.status(400).json({ error: 'Логин обязателен для заполнения' });
+    }
+
+    const trimmedUsername = username.trim();
+
+    // Проверка уникальности username
+    const existingUser = await User.findByUsername(trimmedUsername);
+    if (existingUser) {
+      return res.status(400).json({ error: 'Пользователь с таким логином уже существует' });
     }
 
     let result;
@@ -95,7 +122,7 @@ const register = async (req, res) => {
         return res.status(400).json({ error: checkResult.error });
       }
       // Регистрируем студента
-      result = await registrationService.registerStudent(checkResult.data, password);
+      result = await registrationService.registerStudent(checkResult.data, password, trimmedUsername);
     } else if (role === 'teacher') {
       // Проверяем код преподавателя
       const checkResult = await registrationService.checkTeacherCode(code);
@@ -103,7 +130,7 @@ const register = async (req, res) => {
         return res.status(400).json({ error: checkResult.error });
       }
       // Регистрируем преподавателя
-      result = await registrationService.registerTeacher(checkResult.data, password);
+      result = await registrationService.registerTeacher(checkResult.data, password, trimmedUsername);
     } else {
       return res.status(400).json({ error: 'Неверная роль. Используйте "student" или "teacher"' });
     }
@@ -112,8 +139,29 @@ const register = async (req, res) => {
       return res.status(500).json({ error: 'Ошибка при регистрации пользователя' });
     }
 
+    // Обновление времени последнего онлайна
+    await User.updateLastOnline(result.user.user_id);
+
     // Генерация токена
     const token = generateToken(result.user.user_id, result.user.role_id);
+
+    // Создание сессии пользователя (как при логине)
+    const expiresAt = getTokenExpiration();
+    const ipAddress = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    try {
+      await Session.create({
+        user_id: result.user.user_id,
+        session_token: token,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+        expires_at: expiresAt
+      });
+    } catch (sessionError) {
+      logger.error('Ошибка создания сессии при регистрации:', sessionError);
+      // Не прерываем процесс регистрации, если не удалось создать сессию
+    }
 
     // Удаляем пароль из ответа
     delete result.user.password_hash;
@@ -141,14 +189,14 @@ const login = async (req, res) => {
       return res.status(400).json({ error: 'Логин и пароль обязательны' });
     }
 
-    // Поиск пользователя по username (код из 1С)
-    const user = await User.findByUsername(loginField);
+    // Поиск пользователя по username (формат: группа@фамилия или код@фамилия)
+    let user = await User.findByUsername(loginField);
     
     if (!user) {
       return res.status(401).json({ error: 'Неверный логин или пароль' });
     }
 
-    // Проверка пароля
+    // Проверка пароля (сравнение с хешем в БД через bcrypt)
     const isPasswordValid = await comparePassword(password, user.password_hash);
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Неверный логин или пароль' });
@@ -159,19 +207,19 @@ const login = async (req, res) => {
       return res.status(403).json({ error: 'Аккаунт деактивирован' });
     }
 
-    // Синхронизация данных из 1С (только если не администратор)
-    if (user.role_id !== 1 && user.sync_1c_id) {
+    // Синхронизация данных из 1С (только если не администратор и есть sync_1c_id)
+    if (user.role_name !== 'admin' && user.sync_1c_id) {
       try {
-        if (user.role_id === 3) {
-          // Студент
+        if (user.role_name === 'student') {
+          // Студент: получаем актуальные данные из 1С и обновляем в БД
           const studentData = await oneCService.getStudentByCode(user.sync_1c_id);
           if (studentData) {
             await userUpdateService.updateStudentData(user.user_id, studentData);
             // Обновляем данные пользователя после синхронизации
             user = await User.findById(user.user_id);
           }
-        } else if (user.role_id === 2) {
-          // Преподаватель
+        } else if (user.role_name === 'teacher') {
+          // Преподаватель: получаем актуальные данные из 1С и обновляем в БД
           const teacherData = await oneCService.getTeacherByCode(user.sync_1c_id);
           if (teacherData) {
             await userUpdateService.updateTeacherData(user.user_id, teacherData);

@@ -30,11 +30,15 @@ const getSystemStats = async (req, res) => {
 // Управление пользователями
 const getAllUsers = async (req, res) => {
   try {
-    const { role_id, is_active, search } = req.query;
+    const { role_id, is_active, search, includeUnregistered } = req.query;
     const filters = {};
     if (role_id) filters.role_id = parseInt(role_id);
     if (is_active !== undefined) filters.is_active = is_active === 'true';
     if (search) filters.search = search;
+    // Для админки можно показать всех пользователей, включая незарегистрированных
+    if (includeUnregistered === 'true') {
+      filters.onlyRegistered = false;
+    }
 
     const users = await User.findAll(filters);
     res.json({ users });

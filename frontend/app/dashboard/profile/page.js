@@ -34,24 +34,16 @@ export default function ProfilePage() {
           <strong>Имя:</strong> {user.first_name} {user.last_name}
         </div>
         <div style={{ marginBottom: '1rem' }}>
-          <strong>Email:</strong> {user.email}
-        </div>
-        <div style={{ marginBottom: '1rem' }}>
           <strong>Имя пользователя:</strong> {user.username}
         </div>
-        {user.faculty && (
-          <div style={{ marginBottom: '1rem' }}>
-            <strong>Факультет:</strong> {user.faculty}
-          </div>
-        )}
         {user.department && (
           <div style={{ marginBottom: '1rem' }}>
             <strong>Кафедра:</strong> {user.department}
           </div>
         )}
-        {user.position && (
+        {user.student_group && (
           <div style={{ marginBottom: '1rem' }}>
-            <strong>Должность:</strong> {user.position}
+            <strong>Группа:</strong> {user.student_group}
           </div>
         )}
       </div>

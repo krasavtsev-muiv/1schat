@@ -1,6 +1,7 @@
 // Контроллер для работы администратора с 1С
 const admin1CService = require('../services/admin-1c.service');
 const logger = require('../utils/logger');
+const { handle1CError } = require('../utils/1c-error-handler');
 
 // Создание кафедры в 1С
 const createDepartment = async (req, res) => {
@@ -22,9 +23,14 @@ const createDepartment = async (req, res) => {
     });
   } catch (error) {
     logger.error('Ошибка создания кафедры:', error);
+    
+    if (handle1CError(error, res, 'Ошибка при создании кафедры в системе 1С')) {
+      return;
+    }
+    
     res.status(500).json({
       success: false,
-      error: error.message || 'Ошибка при создании кафедры',
+      error: error.message || 'Ошибка при создании кафедры в системе 1С',
     });
   }
 };
@@ -49,9 +55,14 @@ const createGroup = async (req, res) => {
     });
   } catch (error) {
     logger.error('Ошибка создания группы:', error);
+    
+    if (handle1CError(error, res, 'Ошибка при создании группы в системе 1С')) {
+      return;
+    }
+    
     res.status(500).json({
       success: false,
-      error: error.message || 'Ошибка при создании группы',
+      error: error.message || 'Ошибка при создании группы в системе 1С',
     });
   }
 };
@@ -76,9 +87,14 @@ const createDiscipline = async (req, res) => {
     });
   } catch (error) {
     logger.error('Ошибка создания дисциплины:', error);
+    
+    if (handle1CError(error, res, 'Ошибка при создании дисциплины в системе 1С')) {
+      return;
+    }
+    
     res.status(500).json({
       success: false,
-      error: error.message || 'Ошибка при создании дисциплины',
+      error: error.message || 'Ошибка при создании дисциплины в системе 1С',
     });
   }
 };
@@ -108,9 +124,14 @@ const createTeacher = async (req, res) => {
     });
   } catch (error) {
     logger.error('Ошибка создания преподавателя:', error);
+    
+    if (handle1CError(error, res, 'Ошибка при создании преподавателя в системе 1С')) {
+      return;
+    }
+    
     res.status(500).json({
       success: false,
-      error: error.message || 'Ошибка при создании преподавателя',
+      error: error.message || 'Ошибка при создании преподавателя в системе 1С',
     });
   }
 };
@@ -142,9 +163,14 @@ const createStudent = async (req, res) => {
     });
   } catch (error) {
     logger.error('Ошибка создания студента:', error);
+    
+    if (handle1CError(error, res, 'Ошибка при создании студента в системе 1С')) {
+      return;
+    }
+    
     res.status(500).json({
       success: false,
-      error: error.message || 'Ошибка при создании студента',
+      error: error.message || 'Ошибка при создании студента в системе 1С',
     });
   }
 };

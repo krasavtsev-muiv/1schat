@@ -27,18 +27,28 @@ export default function ChatList({ onSelectChat, refreshKey }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  if (loading) return <div>Загрузка...</div>;
-  if (error) return <div style={{ color: 'red' }}>{error}</div>;
+  if (loading) return <div style={{ padding: '1rem', color: '#666' }}>Загрузка чатов...</div>;
+  if (error) return <div style={{ color: 'red', padding: '1rem' }}>{error}</div>;
+
+  // Функция для получения отображаемого имени чата
+  const getChatDisplayName = (chat) => {
+    if (chat.chat_type === 'private' && chat.other_participant) {
+      // Для приватных чатов показываем имя собеседника
+      const other = chat.other_participant;
+      return `${other.first_name} ${other.last_name}`.trim();
+    }
+    // Для групповых чатов показываем название чата
+    return chat.chat_name || 'Без названия';
+  };
 
   return (
-    <div style={{ border: '1px solid #dee2e6', borderRadius: '4px', padding: '1rem' }}>
-      <h2>Чаты</h2>
+    <div>
       {chats.length === 0 ? (
-        <p>Нет чатов</p>
+        <p style={{ padding: '1rem', color: '#666', fontSize: '0.9rem' }}>Нет чатов</p>
       ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
+        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
           {chats.map((chat) => (
-            <li
+            <div
               key={chat.chat_id}
               onClick={() => onSelectChat(chat)}
               style={{
@@ -47,14 +57,30 @@ export default function ChatList({ onSelectChat, refreshKey }) {
                 background: '#f8f9fa',
                 borderRadius: '4px',
                 cursor: 'pointer',
+                transition: 'background 0.2s',
               }}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#e9ecef'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#f8f9fa'}
             >
-              <strong>{chat.chat_name || 'Без названия'}</strong>
-              <br />
-              <small>{chat.chat_type === 'group' ? 'Групповой' : 'Личный'}</small>
-            </li>
+              <div style={{ fontWeight: '500', fontSize: '0.95rem', marginBottom: '0.25rem' }}>
+                {getChatDisplayName(chat)}
+              </div>
+              <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>
+                {chat.chat_type === 'group' ? '👥 Групповой' : '💬 Личный'}
+              </div>
+              {chat.last_message_at && (
+                <div style={{ fontSize: '0.8rem', color: '#999', marginTop: '0.25rem' }}>
+                  {new Date(chat.last_message_at).toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </div>
+              )}
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

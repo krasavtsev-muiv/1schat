@@ -1,40 +1,47 @@
 -- Начальные данные для базы данных
--- Выполнить после создания схемы (schema.sql) и миграций:
--- - 001_add_1c_tables.sql
--- - 002_update_users_email_nullable.sql (если БД создавалась до удаления email)
--- - 003_remove_email_column.sql (удаление колонки email)
+-- Выполнить после создания схемы (schema.sql)
 -- 
--- ВАЖНО: Этот файл содержит только минимально необходимые данные для развертывания новой БД с нуля
+-- ВАЖНО: 
+-- - Этот файл содержит только минимально необходимые данные для развертывания новой БД с нуля
+-- - Схема schema.sql уже содержит все необходимые таблицы (включая таблицы для интеграции с 1С)
+-- - Миграции не требуются, так как schema.sql актуальна
 -- Все остальные данные (пользователи, кафедры, группы, дисциплины) будут создаваться через:
 -- 1. Регистрацию пользователей через форму регистрации
 -- 2. Создание сущностей администратором через панель управления
 
 -- Вставка ролей
 INSERT INTO roles (role_name, role_description, permissions) VALUES
-('admin', 'Администратор системы', '{"all": true}'::jsonb),
-('manager', 'Менеджер/Преподаватель', '{"chats": true, "users": true, "moderate": true}'::jsonb),
-('student', 'Студент', '{"chats": true, "read": true, "write": true}'::jsonb)
-ON CONFLICT (role_name) DO NOTHING;
+('admin', 'Администратор', '{"all": true, "users": {"create": true, "read": true, "update": true, "delete": true}, "chats": {"create": true, "read": true, "update": true, "delete": true, "moderate": true}, "1c": {"create": true, "read": true, "update": true, "delete": true}, "settings": {"read": true, "update": true}, "feedback": {"read": true, "respond": true}, "export": {"create": true, "read": true}}'::jsonb),
+('teacher', 'Преподаватель', '{"chats": {"create": true, "read": true, "update": true, "moderate": true}, "users": {"read": true}, "messages": {"create": true, "read": true, "update": true, "delete": true}, "files": {"upload": true, "download": true}}'::jsonb),
+('student', 'Студент', '{"chats": {"read": true, "create": true}, "messages": {"create": true, "read": true, "update": true, "delete": true}, "files": {"upload": true, "download": true}}'::jsonb)
+ON CONFLICT (role_name) DO UPDATE SET 
+  role_description = EXCLUDED.role_description,
+  permissions = EXCLUDED.permissions;
 
 -- Вставка администратора
 -- Пароль должен быть захеширован с помощью bcrypt
 -- Пример хеша (для тестирования):
 -- admin123 -> $2b$10$.ngFVHS3/6mAbAoq0e2dO.Bty9wSCrPvBYGSjeU4cPZSRBJ4YlJDG
 -- 
--- ВАЖНО: email полностью удален из системы (колонка удалена)
--- Администратор не синхронизируется с 1С (sync_1c_id и sync_1c_date остаются NULL)
+-- ВАЖНО: 
+-- - email полностью удален из системы (колонка удалена)
+-- - Администратор не синхронизируется с 1С (sync_1c_id остается NULL)
+-- - У администратора уникальное значение для department чтобы отличать от обычных пользователей
+-- - role_id получается через подзапрос для надежности
 
-INSERT INTO users (username, password_hash, first_name, last_name, role_id, faculty, department, position, sync_1c_id, sync_1c_date) VALUES
-('admin', '$2b$10$.ngFVHS3/6mAbAoq0e2dO.Bty9wSCrPvBYGSjeU4cPZSRBJ4YlJDG', 'Администратор', 'Системы', 1, 'ИТ', 'Кафедра ИС', 'Администратор', NULL, NULL)
+INSERT INTO users (username, password_hash, first_name, last_name, role_id, department, student_group, sync_1c_id) 
+SELECT 
+  'admin',
+  '$2b$10$.ngFVHS3/6mAbAoq0e2dO.Bty9wSCrPvBYGSjeU4cPZSRBJ4YlJDG',
+  'Администратор',
+  'Системы',
+  (SELECT role_id FROM roles WHERE role_name = 'admin'),
+  'SYSTEM_ADMIN',
+  NULL,
+  NULL
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin')
 ON CONFLICT (username) DO NOTHING;
 
--- Вставка тегов чатов
-INSERT INTO chat_tags (tag_name, tag_color, description) VALUES
-('Учебный', '#3498db', 'Чаты связанные с учебным процессом'),
-('Административный', '#e74c3c', 'Административные вопросы'),
-('Общий', '#95a5a6', 'Общие обсуждения'),
-('Проект', '#9b59b6', 'Обсуждение проектов')
-ON CONFLICT (tag_name) DO NOTHING;
 
 -- Вставка настроек системы
 INSERT INTO system_settings (setting_key, setting_value, setting_type, description) VALUES

@@ -21,7 +21,7 @@ export default function AdminPage() {
       setStats(response.data.stats);
     } catch (error) {
       if (error.response?.status === 403) {
-        router.push('/dashboard');
+        router.push('/chats');
       }
     } finally {
       setLoading(false);

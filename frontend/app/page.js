@@ -54,7 +54,7 @@ export default function Home() {
           </p>
           <div>
             <Link 
-              href="/dashboard" 
+              href="/chats" 
               style={{ 
                 marginRight: '1rem', 
                 padding: '0.75rem 1.5rem', 
@@ -66,7 +66,7 @@ export default function Home() {
                 fontWeight: 'bold',
               }}
             >
-              Перейти в дашборд
+              Перейти в чаты
             </Link>
             {user.role_id === 1 && (
               <Link 

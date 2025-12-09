@@ -26,7 +26,7 @@ export default function LoginPage() {
       Cookies.set('token', token, { expires: 7 });
       
       // Перенаправление на дашборд
-      router.push('/dashboard');
+      router.push('/chats');
     } catch (err) {
       setError(err.response?.data?.error || 'Ошибка входа в систему');
     } finally {
@@ -40,15 +40,18 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} style={{ marginTop: '2rem' }}>
         {error && <div style={{ color: 'red', marginBottom: '1rem' }}>{error}</div>}
         <div style={{ marginBottom: '1rem' }}>
-          <label>Логин (код из 1С):</label>
+          <label>Логин:</label>
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Введите логин (например: ИТ-21@Иванов)"
+            placeholder="Группа@Фамилия или Код@Фамилия (например: ИТ-21@Иванов)"
             required
             style={{ width: '100%', padding: '0.5rem', marginTop: '0.5rem' }}
           />
+          <small style={{ display: 'block', marginTop: '0.25rem', color: '#666', fontSize: '0.875rem' }}>
+            Для студентов: группа@фамилия, для преподавателей: код@фамилия
+          </small>
         </div>
         <div style={{ marginBottom: '1rem' }}>
           <label>Пароль:</label>

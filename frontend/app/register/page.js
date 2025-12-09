@@ -16,9 +16,11 @@ export default function RegisterPage() {
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [checkingCode, setCheckingCode] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingUsername, setCheckingUsername] = useState(false);
 
   // Загрузка групп при выборе роли "студент"
   useEffect(() => {
@@ -40,7 +42,14 @@ export default function RegisterPage() {
       }
     } catch (err) {
       console.error('Ошибка загрузки групп:', err);
-      setError('Не удалось загрузить список групп');
+      
+      // Проверяем, это ли ошибка лимита запросов
+      if (err.response?.status === 429 || err.response?.data?.isLimitError) {
+        const retryAfter = err.response?.data?.retryAfter || 10;
+        setError(`Достигнут лимит запросов к системе 1С. Пожалуйста, подождите ${retryAfter} секунд и попробуйте снова.`);
+      } else {
+        setError(err.response?.data?.error || 'Не удалось загрузить список групп');
+      }
     } finally {
       setLoadingGroups(false);
     }
@@ -70,12 +79,25 @@ export default function RegisterPage() {
 
       if (response.data.valid) {
         setUserInfo(response.data.data);
+        // Автоматически генерируем username на основе данных из 1С
+        // name содержит "Фамилия Имя Отчество", берем первую часть (фамилию)
+        const lastName = response.data.data.name.split(' ')[0];
+        const autoUsername = role === 'student' && response.data.data.group
+          ? `${response.data.data.group}@${lastName}`
+          : `${response.data.data.code}@${lastName}`;
+        setUsername(autoUsername);
         setStep(2); // Переходим к вводу пароля
       } else {
         setError(response.data.error || 'Код не подтверждён');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Ошибка при проверке кода');
+      // Проверяем, это ли ошибка лимита запросов
+      if (err.response?.status === 429 || err.response?.data?.isLimitError) {
+        const retryAfter = err.response?.data?.retryAfter || 10;
+        setError(`Достигнут лимит запросов к системе 1С. Пожалуйста, подождите ${retryAfter} секунд и попробуйте снова.`);
+      } else {
+        setError(err.response?.data?.error || 'Ошибка при проверке кода');
+      }
     } finally {
       setCheckingCode(false);
     }
@@ -92,17 +114,30 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!username || username.trim() === '') {
+      setError('Логин обязателен для заполнения');
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await authAPI.register({
         code,
         role,
         password,
+        username: username.trim(),
         group: role === 'student' ? group : undefined,
       });
 
+      // После успешной регистрации пользователь автоматически авторизован
       const { token, user } = response.data;
+      
+      // Сохраняем токен в cookies для авторизации
       Cookies.set('token', token, { expires: 7 });
-      router.push('/dashboard');
+      
+      // Перенаправляем на главную страницу (чаты)
+      // Пользователь уже авторизован, не нужно идти на страницу логина
+      router.push('/chats');
     } catch (err) {
       setError(err.response?.data?.error || 'Ошибка регистрации');
     } finally {
@@ -259,6 +294,30 @@ export default function RegisterPage() {
 
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+              Логин:
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Введите уникальный логин"
+              required
+              style={{ 
+                width: '100%', 
+                padding: '0.75rem', 
+                marginTop: '0.5rem',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '1rem'
+              }}
+            />
+            <small style={{ display: 'block', marginTop: '0.25rem', color: '#666', fontSize: '0.875rem' }}>
+              Логин будет использоваться для входа в систему. Должен быть уникальным.
+            </small>
+          </div>
+
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
               Придумайте пароль:
             </label>
             <input
@@ -285,6 +344,7 @@ export default function RegisterPage() {
               onClick={() => {
                 setStep(1);
                 setPassword('');
+                setUsername('');
                 setUserInfo(null);
                 setError('');
               }}
@@ -303,7 +363,7 @@ export default function RegisterPage() {
             </button>
             <button
               type="submit"
-              disabled={loading || !password}
+              disabled={loading || !password || !username}
               style={{ 
                 flex: 2,
                 padding: '0.75rem', 

@@ -170,21 +170,31 @@ class Admin1CService {
       // Находим дисциплину в нашей БД
       const disciplineRecord = await Discipline.findByName(discipline);
       
-      // Создаём запись преподавателя в нашей БД (без пароля, будет установлен при регистрации)
-      const username = `${response.Код}@${last_name}`;
-      let teacher = await User.findByUsername(username);
+      // Проверяем существование преподавателя по sync_1c_id
+      let teacher = null;
+      if (response.Код) {
+        const { query } = require('../../config/database');
+        const teacherResult = await query(
+          'SELECT * FROM users WHERE sync_1c_id = $1',
+          [response.Код.toString()]
+        );
+        if (teacherResult.rows.length > 0) {
+          teacher = teacherResult.rows[0];
+        }
+      }
       
+      // Создаём запись преподавателя в нашей БД (без username и пароля, будут установлены при регистрации)
       if (!teacher) {
         const { hashPassword } = require('../utils/password.util');
         const tempPasswordHash = await hashPassword('temp_' + response.Код);
         
         teacher = await User.create({
-          username,
+          username: null, // Username будет установлен при регистрации
           password_hash: tempPasswordHash,
           first_name,
           last_name,
           middle_name: middle_name || null,
-          role_id: 2, // manager
+          role_id: 2, // teacher
           sync_1c_id: response.Код?.toString(),
         });
 
@@ -233,16 +243,26 @@ class Admin1CService {
         throw new Error(response.error || 'Ошибка создания студента в 1С');
       }
 
-      // Создаём запись студента в нашей БД (без пароля, будет установлен при регистрации)
-      const username = group ? `${group}@${last_name}` : `${response.Код}@${last_name}`;
-      let student = await User.findByUsername(username);
+      // Проверяем существование студента по sync_1c_id
+      let student = null;
+      if (response.Код) {
+        const { query } = require('../../config/database');
+        const studentResult = await query(
+          'SELECT * FROM users WHERE sync_1c_id = $1',
+          [response.Код.toString()]
+        );
+        if (studentResult.rows.length > 0) {
+          student = studentResult.rows[0];
+        }
+      }
       
+      // Создаём запись студента в нашей БД (без username и пароля, будут установлены при регистрации)
       if (!student) {
         const { hashPassword } = require('../utils/password.util');
         const tempPasswordHash = await hashPassword('temp_' + response.Код);
         
         student = await User.create({
-          username,
+          username: null, // Username будет установлен при регистрации
           password_hash: tempPasswordHash,
           first_name,
           last_name,

@@ -5,16 +5,16 @@ class User {
   // Получить пользователя по ID
   static async findById(userId) {
     const result = await query(
-      'SELECT * FROM users WHERE user_id = $1',
+      'SELECT u.*, r.role_name FROM users u JOIN roles r ON u.role_id = r.role_id WHERE u.user_id = $1',
       [userId]
     );
     return result.rows[0];
   }
 
-  // Получить пользователя по username
+  // Получить пользователя по username (только для пользователей с установленным username)
   static async findByUsername(username) {
     const result = await query(
-      'SELECT * FROM users WHERE username = $1',
+      'SELECT u.*, r.role_name FROM users u JOIN roles r ON u.role_id = r.role_id WHERE u.username = $1 AND u.username IS NOT NULL',
       [username]
     );
     return result.rows[0];
@@ -28,11 +28,8 @@ class User {
       first_name,
       last_name,
       middle_name,
-      phone,
       role_id,
-      faculty,
       department,
-      position,
       student_group,
       sync_1c_id
     } = userData;
@@ -40,12 +37,12 @@ class User {
     const result = await query(
       `INSERT INTO users (
         username, password_hash, first_name, last_name, middle_name,
-        phone, role_id, faculty, department, position, student_group, sync_1c_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        role_id, department, student_group, sync_1c_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *`,
       [
         username, password_hash, first_name, last_name, middle_name,
-        phone, role_id, faculty, department, position, student_group, sync_1c_id
+        role_id, department, student_group, sync_1c_id
       ]
     );
     return result.rows[0];
@@ -91,6 +88,13 @@ class User {
     let sql = 'SELECT u.*, r.role_name FROM users u JOIN roles r ON u.role_id = r.role_id WHERE 1=1';
     const params = [];
     let paramCount = 1;
+
+    // По умолчанию показываем только зарегистрированных пользователей (с username)
+    // Это нужно для списка контактов - показываем только тех, с кем можно начать чат
+    // Если onlyRegistered явно установлен в false, показываем всех (для админки)
+    if (filters.onlyRegistered === undefined || filters.onlyRegistered === true) {
+      sql += ` AND u.username IS NOT NULL`;
+    }
 
     if (filters.role_id) {
       sql += ` AND u.role_id = $${paramCount}`;

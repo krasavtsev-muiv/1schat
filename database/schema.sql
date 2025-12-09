@@ -22,24 +22,20 @@ CREATE TABLE roles (
 -- Таблица пользователей
 CREATE TABLE users (
     user_id SERIAL PRIMARY KEY,
-    username VARCHAR(100) UNIQUE NOT NULL,
+    username VARCHAR(100) UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     first_name VARCHAR(100) NOT NULL,
     last_name VARCHAR(100) NOT NULL,
     middle_name VARCHAR(100),
-    phone VARCHAR(20),
     avatar_url VARCHAR(500),
     role_id INTEGER NOT NULL REFERENCES roles(role_id) ON DELETE RESTRICT,
-    faculty VARCHAR(200),
     department VARCHAR(200),
-    position VARCHAR(200),
     student_group VARCHAR(50),
     is_active BOOLEAN DEFAULT TRUE,
     last_online TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    sync_1c_id VARCHAR(100) UNIQUE,
-    sync_1c_date TIMESTAMP
+    sync_1c_id VARCHAR(100) UNIQUE
 );
 
 -- Таблица чатов
@@ -51,7 +47,6 @@ CREATE TABLE chats (
     chat_type chat_type_enum NOT NULL,
     created_by INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
     description TEXT,
-    avatar_url VARCHAR(500),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -178,23 +173,6 @@ CREATE TABLE export_history (
     completed_at TIMESTAMP
 );
 
--- Таблица тегов чатов
-CREATE TABLE chat_tags (
-    tag_id SERIAL PRIMARY KEY,
-    tag_name VARCHAR(100) UNIQUE NOT NULL,
-    tag_color VARCHAR(7),
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Таблица связи чатов и тегов
-CREATE TABLE chat_tag_relations (
-    relation_id SERIAL PRIMARY KEY,
-    chat_id INTEGER NOT NULL REFERENCES chats(chat_id) ON DELETE CASCADE,
-    tag_id INTEGER NOT NULL REFERENCES chat_tags(tag_id) ON DELETE CASCADE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(chat_id, tag_id)
-);
 
 -- Таблица шаблонов сообщений
 CREATE TABLE message_templates (
@@ -266,81 +244,78 @@ CREATE TABLE teacher_disciplines (
 -- Индексы для оптимизации запросов
 
 -- Индексы для таблицы users
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_role_id ON users(role_id);
-CREATE INDEX idx_users_sync_1c_id ON users(sync_1c_id);
-CREATE INDEX idx_users_last_online ON users(last_online);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
+CREATE INDEX IF NOT EXISTS idx_users_sync_1c_id ON users(sync_1c_id) WHERE sync_1c_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_last_online ON users(last_online);
 
 -- Индексы для таблицы chats
-CREATE INDEX idx_chats_created_by ON chats(created_by);
-CREATE INDEX idx_chats_chat_type ON chats(chat_type);
-CREATE INDEX idx_chats_last_message_at ON chats(last_message_at);
-CREATE INDEX idx_chats_is_active ON chats(is_active);
+CREATE INDEX IF NOT EXISTS idx_chats_created_by ON chats(created_by);
+CREATE INDEX IF NOT EXISTS idx_chats_chat_type ON chats(chat_type);
+CREATE INDEX IF NOT EXISTS idx_chats_last_message_at ON chats(last_message_at);
+CREATE INDEX IF NOT EXISTS idx_chats_is_active ON chats(is_active);
 
 -- Индексы для таблицы chat_participants
-CREATE INDEX idx_chat_participants_chat_id ON chat_participants(chat_id);
-CREATE INDEX idx_chat_participants_user_id ON chat_participants(user_id);
-CREATE INDEX idx_chat_participants_last_read_at ON chat_participants(last_read_at);
+CREATE INDEX IF NOT EXISTS idx_chat_participants_chat_id ON chat_participants(chat_id);
+CREATE INDEX IF NOT EXISTS idx_chat_participants_user_id ON chat_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_participants_last_read_at ON chat_participants(last_read_at);
 
 -- Индексы для таблицы messages
-CREATE INDEX idx_messages_chat_id ON messages(chat_id);
-CREATE INDEX idx_messages_sender_id ON messages(sender_id);
-CREATE INDEX idx_messages_created_at ON messages(created_at);
-CREATE INDEX idx_messages_chat_created ON messages(chat_id, created_at);
-CREATE INDEX idx_messages_forwarded_from ON messages(forwarded_from_message_id);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_created ON messages(chat_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_forwarded_from ON messages(forwarded_from_message_id);
 
 -- Индексы для таблицы message_files
-CREATE INDEX idx_message_files_message_id ON message_files(message_id);
-CREATE INDEX idx_message_files_file_type ON message_files(file_type);
+CREATE INDEX IF NOT EXISTS idx_message_files_message_id ON message_files(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_files_file_type ON message_files(file_type);
 
 -- Индексы для таблицы notifications
-CREATE INDEX idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX idx_notifications_is_read ON notifications(is_read);
-CREATE INDEX idx_notifications_created_at ON notifications(created_at);
-CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);
 
 -- Индексы для таблицы user_sessions
-CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
-CREATE INDEX idx_user_sessions_token ON user_sessions(session_token);
-CREATE INDEX idx_user_sessions_is_active ON user_sessions(is_active);
-CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_is_active ON user_sessions(is_active);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
 
 -- Индексы для таблицы feedback
-CREATE INDEX idx_feedback_user_id ON feedback(user_id);
-CREATE INDEX idx_feedback_status ON feedback(status);
-CREATE INDEX idx_feedback_created_at ON feedback(created_at);
+CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
+CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at);
 
 -- Индексы для таблицы export_history
-CREATE INDEX idx_export_history_user_id ON export_history(user_id);
-CREATE INDEX idx_export_history_status ON export_history(status);
-CREATE INDEX idx_export_history_created_at ON export_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_export_history_user_id ON export_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_export_history_status ON export_history(status);
+CREATE INDEX IF NOT EXISTS idx_export_history_created_at ON export_history(created_at);
 
--- Индексы для таблицы chat_tag_relations
-CREATE INDEX idx_chat_tag_relations_chat_id ON chat_tag_relations(chat_id);
-CREATE INDEX idx_chat_tag_relations_tag_id ON chat_tag_relations(tag_id);
 
 -- Индексы для таблицы message_templates
-CREATE INDEX idx_message_templates_user_id ON message_templates(user_id);
-CREATE INDEX idx_message_templates_is_public ON message_templates(is_public);
-CREATE INDEX idx_message_templates_category ON message_templates(category);
+CREATE INDEX IF NOT EXISTS idx_message_templates_user_id ON message_templates(user_id);
+CREATE INDEX IF NOT EXISTS idx_message_templates_is_public ON message_templates(is_public);
+CREATE INDEX IF NOT EXISTS idx_message_templates_category ON message_templates(category);
 
 -- Индексы для таблиц интеграции с 1С
-CREATE INDEX idx_departments_sync_1c_code ON departments(sync_1c_code);
-CREATE INDEX idx_departments_name ON departments(name);
+CREATE INDEX IF NOT EXISTS idx_departments_sync_1c_code ON departments(sync_1c_code);
+CREATE INDEX IF NOT EXISTS idx_departments_name ON departments(name);
 
-CREATE INDEX idx_groups_sync_1c_code ON groups(sync_1c_code);
-CREATE INDEX idx_groups_department_id ON groups(department_id);
-CREATE INDEX idx_groups_name ON groups(name);
+CREATE INDEX IF NOT EXISTS idx_groups_sync_1c_code ON groups(sync_1c_code);
+CREATE INDEX IF NOT EXISTS idx_groups_department_id ON groups(department_id);
+CREATE INDEX IF NOT EXISTS idx_groups_name ON groups(name);
 
-CREATE INDEX idx_disciplines_sync_1c_code ON disciplines(sync_1c_code);
-CREATE INDEX idx_disciplines_department_id ON disciplines(department_id);
-CREATE INDEX idx_disciplines_name ON disciplines(name);
+CREATE INDEX IF NOT EXISTS idx_disciplines_sync_1c_code ON disciplines(sync_1c_code);
+CREATE INDEX IF NOT EXISTS idx_disciplines_department_id ON disciplines(department_id);
+CREATE INDEX IF NOT EXISTS idx_disciplines_name ON disciplines(name);
 
-CREATE INDEX idx_student_disciplines_user_id ON student_disciplines(user_id);
-CREATE INDEX idx_student_disciplines_discipline_id ON student_disciplines(discipline_id);
+CREATE INDEX IF NOT EXISTS idx_student_disciplines_user_id ON student_disciplines(user_id);
+CREATE INDEX IF NOT EXISTS idx_student_disciplines_discipline_id ON student_disciplines(discipline_id);
 
-CREATE INDEX idx_teacher_disciplines_user_id ON teacher_disciplines(user_id);
-CREATE INDEX idx_teacher_disciplines_discipline_id ON teacher_disciplines(discipline_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_disciplines_user_id ON teacher_disciplines(user_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_disciplines_discipline_id ON teacher_disciplines(discipline_id);
 
 -- Триггеры для автоматического обновления updated_at
 

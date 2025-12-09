@@ -19,6 +19,7 @@ export default function Breadcrumbs() {
     'login': 'Вход',
     'register': 'Регистрация',
     'dashboard': 'Дашборд',
+    'chats': 'Чаты',
     'admin': 'Административная панель',
     'profile': 'Профиль',
     'settings': 'Настройки',
