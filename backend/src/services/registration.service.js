@@ -19,7 +19,7 @@ class RegistrationService {
       if (!studentData) {
         return {
           valid: false,
-          error: 'Студент с таким кодом не найден в системе 1С',
+          error: `Студент с кодом ${code} не найден`,
         };
       }
 
@@ -43,9 +43,26 @@ class RegistrationService {
         throw error;
       }
       
+      // Если пришла ошибка 404 от 1С API, значит студент не найден
+      if (error.response?.status === 404) {
+        return {
+          valid: false,
+          error: `Студент с кодом ${code} не найден`,
+        };
+      }
+      
+      // Проверяем сообщение об ошибке - возможно там есть информация о том, что не найден
+      const errorMessage = error.response?.data?.error || error.message || '';
+      if (errorMessage.toLowerCase().includes('не найден') || errorMessage.toLowerCase().includes('not found')) {
+        return {
+          valid: false,
+          error: `Студент с кодом ${code} не найден`,
+        };
+      }
+      
       return {
         valid: false,
-        error: error.message || 'Ошибка при проверке кода в системе 1С',
+        error: errorMessage || 'Ошибка при проверке кода в системе 1С',
       };
     }
   }
@@ -58,7 +75,7 @@ class RegistrationService {
       if (!teacherData) {
         return {
           valid: false,
-          error: 'Преподаватель с таким кодом не найден в системе 1С',
+          error: `Преподаватель с кодом ${code} не найден`,
         };
       }
 
@@ -73,9 +90,27 @@ class RegistrationService {
       if (error.isLimitError || error.message === 'LIMIT_REACHED') {
         throw error;
       }
+      
+      // Если пришла ошибка 404 от 1С API, значит преподаватель не найден
+      if (error.response?.status === 404) {
+        return {
+          valid: false,
+          error: `Преподаватель с кодом ${code} не найден`,
+        };
+      }
+      
+      // Проверяем сообщение об ошибке - возможно там есть информация о том, что не найден
+      const errorMessage = error.response?.data?.error || error.message || '';
+      if (errorMessage.toLowerCase().includes('не найден') || errorMessage.toLowerCase().includes('not found')) {
+        return {
+          valid: false,
+          error: `Преподаватель с кодом ${code} не найден`,
+        };
+      }
+      
       return {
         valid: false,
-        error: error.message || 'Ошибка при проверке кода в системе 1С',
+        error: errorMessage || 'Ошибка при проверке кода в системе 1С',
       };
     }
   }

@@ -16,6 +16,16 @@ const io = socketIo(server, {
   },
 });
 
+// Устанавливаем io в утилиту для доступа из других модулей
+const socketUtils = require('./src/utils/socket.io');
+socketUtils.setIO(io);
+
+// Функция для получения экземпляра Socket.IO из других модулей
+// Определяем сразу после создания io, чтобы была доступна при импорте
+const getSocket = () => {
+  return io;
+};
+
 // Middleware
 const requestLogger = require('./src/middleware/logger.middleware');
 app.use(requestLogger);
@@ -86,5 +96,5 @@ server.listen(PORT, () => {
   console.log(`🚀 Сервер запущен на порту ${PORT}`);
 });
 
-module.exports = { app, server, io };
+module.exports = { app, server, io, getSocket };
 

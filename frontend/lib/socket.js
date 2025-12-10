@@ -26,6 +26,8 @@ export const initSocket = () => {
     console.log('Подключено к WebSocket серверу');
     // Присоединение к чатам пользователя
     socket.emit('join_chats');
+    // Комната contacts_updates присоединяется автоматически на сервере при подключении
+    console.log('Подписка на обновления контактов активна');
   });
 
   socket.on('disconnect', () => {

@@ -1,6 +1,6 @@
 // Сервис для работы с уведомлениями
 const Notification = require('../models/notification.model');
-const { getSocket } = require('../../server');
+const { getSocket } = require('../utils/socket.io');
 
 // Создание уведомления о новом сообщении
 const createMessageNotification = async (message, chat, recipientId) => {

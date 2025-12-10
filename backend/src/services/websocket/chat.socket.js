@@ -34,6 +34,14 @@ const handleConnection = (io) => {
     // Обновление статуса онлайн
     User.updateLastOnline(socket.userId);
 
+    // Присоединение к персональной комнате пользователя для уведомлений
+    socket.join(`user_${socket.userId}`);
+    console.log(`Пользователь ${socket.userId} присоединился к комнате user_${socket.userId}`);
+
+    // Присоединение к общей комнате для обновлений контактов
+    socket.join('contacts_updates');
+    console.log(`Пользователь ${socket.userId} присоединился к комнате contacts_updates`);
+
     // Присоединение к комнатам чатов пользователя
     socket.on('join_chats', async () => {
       try {

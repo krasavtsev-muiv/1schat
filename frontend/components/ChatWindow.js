@@ -5,40 +5,61 @@ import { useState, useEffect, useRef } from 'react';
 import { messageAPI } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
 
-export default function ChatWindow({ chat }) {
+export default function ChatWindow({ chat, onChatCreated }) {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentChatId, setCurrentChatId] = useState(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (chat) {
+    if (chat && chat.chat_id) {
+      // Загружаем сообщения только если чат уже создан (есть chat_id)
+      const chatId = chat.chat_id;
+      setCurrentChatId(chatId);
       loadMessages();
       const socket = getSocket();
       if (socket) {
-        socket.on('new_message', (message) => {
-          if (message.chat_id === chat.chat_id) {
-            setMessages((prev) => [...prev, message]);
+        const handleNewMessage = (message) => {
+          // Проверяем, что сообщение относится к текущему чату
+          if (message.chat_id === chatId) {
+            // Проверяем, нет ли уже такого сообщения (избегаем дублирования)
+            setMessages((prev) => {
+              const exists = prev.some(m => m.message_id === message.message_id);
+              if (exists) {
+                return prev;
+              }
+              return [...prev, message];
+            });
           }
-        });
-        socket.emit('join_chat', chat.chat_id);
+        };
+        socket.on('new_message', handleNewMessage);
+        socket.emit('join_chat', chatId);
+        
+        return () => {
+          socket.off('new_message', handleNewMessage);
+        };
       }
+    } else {
+      // Если чат временный, просто очищаем сообщения
+      setCurrentChatId(null);
+      setMessages([]);
+      setLoading(false);
     }
-    return () => {
-      const socket = getSocket();
-      if (socket) {
-        socket.off('new_message');
-      }
-    };
-  }, [chat]);
+  }, [chat?.chat_id]); // Зависимость только от chat_id, чтобы не пересоздавать при изменении других полей
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const loadMessages = async () => {
+  const loadMessages = async (chatIdToLoad = null) => {
+    const targetChatId = chatIdToLoad || (chat && chat.chat_id);
+    if (!targetChatId) {
+      setLoading(false);
+      return;
+    }
     try {
-      const response = await messageAPI.getChatMessages(chat.chat_id);
+      const response = await messageAPI.getChatMessages(targetChatId);
       setMessages(response.data.messages);
     } catch (error) {
       console.error('Ошибка загрузки сообщений:', error);
@@ -49,19 +70,87 @@ export default function ChatWindow({ chat }) {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    const messageText = newMessage.trim();
+    if (!messageText) return;
 
-    try {
-      const socket = getSocket();
-      if (socket) {
-        socket.emit('send_message', {
-          chat_id: chat.chat_id,
-          message_text: newMessage,
+    let chatId = chat.chat_id;
+    
+    // Если чат временный (без chat_id), создаем его перед отправкой сообщения
+    if (!chatId || chat.is_temp) {
+      try {
+        const { chatAPI } = await import('@/lib/api');
+        const createResponse = await chatAPI.createChat({
+          chat_type: 'private',
+          participant_ids: chat.other_participant ? [chat.other_participant.user_id] : [],
         });
+        
+        if (!createResponse.data || !createResponse.data.chat) {
+          throw new Error('Не удалось создать чат: нет данных в ответе');
+        }
+        
+        chatId = createResponse.data.chat.chat_id;
+        
+        // Получаем полную информацию о созданном чате
+        const chatResponse = await chatAPI.getChatById(chatId);
+        if (!chatResponse.data || !chatResponse.data.chat) {
+          throw new Error('Не удалось получить данные созданного чата');
+        }
+        
+        const createdChat = chatResponse.data.chat;
+        
+        // Обновляем родительский компонент через callback
+        if (onChatCreated) {
+          onChatCreated(createdChat);
+        }
+        
+        // Обновляем текущий chat_id
+        setCurrentChatId(chatId);
+        
+        // Присоединяемся к комнате чата через WebSocket
+        const socket = getSocket();
+        if (!socket) {
+          throw new Error('WebSocket недоступен');
+        }
+        
+        socket.emit('join_chat', chatId);
+        
+        // Загружаем сообщения для созданного чата
+        await loadMessages(chatId);
+        
+        // Очищаем поле ввода только после успешного создания чата
         setNewMessage('');
+        
+        // Отправляем сообщение после создания чата
+        // Обработчик new_message уже установлен в useEffect, не нужно добавлять еще один
+        socket.emit('send_message', {
+          chat_id: chatId,
+          message_text: messageText,
+        });
+        
+        return; // Успешно завершаем выполнение
+      } catch (createError) {
+        console.error('Ошибка создания чата:', createError);
+        alert(`Ошибка создания чата: ${createError.message || 'Неизвестная ошибка'}`);
+        return; // Прерываем выполнение при ошибке
       }
+    }
+    
+    // Чат уже существует, просто отправляем сообщение
+    try {
+      setNewMessage(''); // Очищаем поле ввода
+      const socket = getSocket();
+      if (!socket) {
+        throw new Error('WebSocket недоступен');
+      }
+      
+      socket.emit('send_message', {
+        chat_id: chatId,
+        message_text: messageText,
+      });
     } catch (error) {
       console.error('Ошибка отправки сообщения:', error);
+      alert(`Ошибка отправки сообщения: ${error.message || 'Неизвестная ошибка'}`);
+      setNewMessage(messageText); // Возвращаем текст сообщения в поле ввода
     }
   };
 
@@ -81,7 +170,7 @@ export default function ChatWindow({ chat }) {
   };
 
   if (!chat) return <div>Выберите чат</div>;
-  if (loading) return <div>Загрузка сообщений...</div>;
+  if (loading && chat.chat_id) return <div>Загрузка сообщений...</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

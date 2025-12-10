@@ -8,6 +8,7 @@ const oneCService = require('../services/1c-integration.service');
 const userUpdateService = require('../services/user-update.service');
 const logger = require('../utils/logger');
 const { handle1CError } = require('../utils/1c-error-handler');
+const { getSocket } = require('../utils/socket.io');
 
 // Проверка кода пользователя в 1С (для регистрации)
 const checkCode = async (req, res) => {
@@ -24,7 +25,9 @@ const checkCode = async (req, res) => {
       }
       const result = await registrationService.checkStudentCode(code, group);
       if (!result.valid) {
-        return res.status(400).json({ error: result.error });
+        // Если студент не найден, возвращаем 404
+        const isNotFound = result.error.includes('не найден');
+        return res.status(isNotFound ? 404 : 400).json({ error: result.error });
       }
       return res.json({
         valid: true,
@@ -39,7 +42,9 @@ const checkCode = async (req, res) => {
     } else if (role === 'teacher') {
       const result = await registrationService.checkTeacherCode(code);
       if (!result.valid) {
-        return res.status(400).json({ error: result.error });
+        // Если преподаватель не найден, возвращаем 404
+        const isNotFound = result.error.includes('не найден');
+        return res.status(isNotFound ? 404 : 400).json({ error: result.error });
       }
       return res.json({
         valid: true,
@@ -166,11 +171,50 @@ const register = async (req, res) => {
     // Удаляем пароль из ответа
     delete result.user.password_hash;
 
+    // Отправляем ответ клиенту сначала
     res.status(201).json({
       message: 'Пользователь успешно зарегистрирован',
       user: result.user,
       token,
     });
+
+    // Отправляем уведомление всем пользователям о новом зарегистрированном пользователе
+    // Это нужно для обновления списка контактов
+    // Делаем это после отправки ответа, чтобы не задерживать регистрацию
+    try {
+      const io = getSocket();
+      if (io) {
+        // Получаем полную информацию о пользователе с ролью (после сохранения в БД)
+        const registeredUser = await User.findById(result.user.user_id);
+        if (registeredUser && registeredUser.role_name && registeredUser.username && registeredUser.is_active) {
+          const userData = {
+            user_id: registeredUser.user_id,
+            first_name: registeredUser.first_name,
+            last_name: registeredUser.last_name,
+            middle_name: registeredUser.middle_name,
+            role_name: registeredUser.role_name,
+            student_group: registeredUser.student_group,
+            is_active: registeredUser.is_active,
+            username: registeredUser.username
+          };
+          
+          // Получаем количество пользователей в комнате для отладки
+          const contactsRoom = io.sockets.adapter.rooms.get('contacts_updates');
+          const usersInRoom = contactsRoom ? contactsRoom.size : 0;
+          
+          logger.info(`Отправка события user_registered для пользователя ${registeredUser.user_id} (${registeredUser.first_name} ${registeredUser.last_name}). Пользователей в комнате contacts_updates: ${usersInRoom}`);
+          io.to('contacts_updates').emit('user_registered', userData);
+          logger.info(`Событие user_registered отправлено в комнату contacts_updates (${usersInRoom} пользователей)`);
+        } else {
+          logger.warn(`Не удалось отправить уведомление для пользователя ${result.user.user_id}: username=${registeredUser?.username}, is_active=${registeredUser?.is_active}, role_name=${registeredUser?.role_name}`);
+        }
+      } else {
+        logger.warn('Socket.IO недоступен для отправки уведомления о регистрации');
+      }
+    } catch (socketError) {
+      // Логируем ошибку, но не прерываем процесс регистрации
+      logger.error('Ошибка отправки уведомления о регистрации через WebSocket:', socketError);
+    }
   } catch (error) {
     logger.error('Ошибка регистрации:', error);
     res.status(500).json({ error: error.message || 'Ошибка при регистрации пользователя' });

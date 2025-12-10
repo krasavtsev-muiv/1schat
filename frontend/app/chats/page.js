@@ -20,7 +20,22 @@ export default function ChatsPage() {
 
   useEffect(() => {
     loadUser();
-    initSocket();
+    const socket = initSocket();
+    
+    if (socket) {
+      // Подписываемся на событие создания чата
+      socket.on('chat_created', (data) => {
+        // Обновляем список чатов, если чат был создан с участием текущего пользователя
+        setChatListKey(prev => prev + 1);
+      });
+      
+      // Подписка на user_registered не нужна здесь - ContactList сам обрабатывает это событие
+      // Убираем двойную подписку, чтобы избежать мерцания
+      
+      return () => {
+        socket.off('chat_created');
+      };
+    }
   }, []);
 
   const loadUser = async () => {
@@ -51,21 +66,21 @@ export default function ChatsPage() {
         return;
       }
       
-      // Если передан ID контакта, создаем новый приватный чат
-      const response = await chatAPI.createChat({
-        chat_type: 'private',
-        participant_ids: [contactIdOrChat],
-      });
-      
-      if (response.data.chat) {
-        // Получаем полную информацию о созданном чате с участниками
-        const chatResponse = await chatAPI.getChatById(response.data.chat.chat_id);
-        setSelectedChat(chatResponse.data.chat);
-        setChatListKey(prev => prev + 1); // Обновляем список чатов
+      // Если передан временный чат (без chat_id), просто открываем его
+      // Чат будет создан при отправке первого сообщения
+      if (contactIdOrChat && typeof contactIdOrChat === 'object' && contactIdOrChat.is_temp) {
+        setSelectedChat(contactIdOrChat);
+        return;
       }
+      
+      // Если передан ID контакта (старая логика - не должна использоваться, но оставляем для совместимости)
+      // Создаем временный чат вместо немедленного создания
+      const contact = contactIdOrChat; // В этом случае это user_id
+      // Но лучше не обрабатывать этот случай, так как ContactList теперь передает объект
+      console.warn('Получен ID контакта вместо объекта чата');
     } catch (err) {
-      console.error('Ошибка создания чата:', err);
-      alert(err.response?.data?.error || 'Ошибка создания чата');
+      console.error('Ошибка открытия чата:', err);
+      alert(err.response?.data?.error || 'Ошибка открытия чата');
     }
   };
 
@@ -138,7 +153,14 @@ export default function ChatsPage() {
 
       {/* Окно чата */}
       <div style={{ flex: 1 }}>
-        <ChatWindow chat={selectedChat} />
+        <ChatWindow 
+          chat={selectedChat}
+          onChatCreated={(createdChat) => {
+            // Обновляем выбранный чат после создания
+            setSelectedChat(createdChat);
+            setChatListKey(prev => prev + 1); // Обновляем список чатов
+          }}
+        />
       </div>
 
       {/* Модальное окно создания чата */}

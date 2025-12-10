@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { chatAPI } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 
 export default function ChatList({ onSelectChat, refreshKey }) {
   const [chats, setChats] = useState([]);
@@ -26,6 +27,25 @@ export default function ChatList({ onSelectChat, refreshKey }) {
     loadChats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
+
+  // Подписываемся на события WebSocket для обновления списка чатов
+  useEffect(() => {
+    const socket = getSocket();
+    if (socket) {
+      // Подписываемся на событие создания чата
+      const handleChatCreated = () => {
+        // Обновляем список чатов
+        loadChats();
+      };
+      
+      socket.on('chat_created', handleChatCreated);
+      
+      return () => {
+        socket.off('chat_created', handleChatCreated);
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) return <div style={{ padding: '1rem', color: '#666' }}>Загрузка чатов...</div>;
   if (error) return <div style={{ color: 'red', padding: '1rem' }}>{error}</div>;

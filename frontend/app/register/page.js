@@ -96,7 +96,10 @@ export default function RegisterPage() {
         const retryAfter = err.response?.data?.retryAfter || 10;
         setError(`Достигнут лимит запросов к системе 1С. Пожалуйста, подождите ${retryAfter} секунд и попробуйте снова.`);
       } else {
-        setError(err.response?.data?.error || 'Ошибка при проверке кода');
+        // Показываем сообщение об ошибке из ответа сервера
+        // Если есть конкретное сообщение, используем его, иначе общее
+        const errorMessage = err.response?.data?.error || err.message || 'Ошибка при проверке кода';
+        setError(errorMessage);
       }
     } finally {
       setCheckingCode(false);

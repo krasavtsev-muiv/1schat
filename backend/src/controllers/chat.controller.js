@@ -2,6 +2,7 @@
 const Chat = require('../models/chat.model');
 const Message = require('../models/message.model');
 const User = require('../models/user.model');
+const { getSocket } = require('../utils/socket.io');
 
 // Создание нового чата
 const createChat = async (req, res) => {
@@ -97,6 +98,24 @@ const createChat = async (req, res) => {
           }
         };
       }
+    }
+
+    // Отправляем уведомление всем участникам чата через WebSocket
+    try {
+      const io = getSocket();
+      if (io) {
+        const participants = await Chat.getParticipants(chat.chat_id);
+        participants.forEach(participant => {
+          // Отправляем событие создания чата каждому участнику
+          io.to(`user_${participant.user_id}`).emit('chat_created', {
+            chat: chatWithParticipant,
+            chat_id: chat.chat_id
+          });
+        });
+      }
+    } catch (socketError) {
+      // Логируем ошибку, но не прерываем создание чата
+      console.error('Ошибка отправки уведомления о создании чата через WebSocket:', socketError);
     }
 
     res.status(201).json({
