@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import api from '@/lib/api';
 
 export default function NotificationBell() {
@@ -27,7 +26,7 @@ export default function NotificationBell() {
   };
 
   return (
-    <Link href="/dashboard/notifications" style={{ position: 'relative', textDecoration: 'none', color: 'inherit' }}>
+    <div style={{ position: 'relative', cursor: 'default' }}>
       <span style={{ fontSize: '1.5rem' }}>🔔</span>
       {unreadCount > 0 && (
         <span
@@ -50,7 +49,7 @@ export default function NotificationBell() {
           {unreadCount > 9 ? '9+' : unreadCount}
         </span>
       )}
-    </Link>
+    </div>
   );
 }
 

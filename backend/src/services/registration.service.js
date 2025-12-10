@@ -134,15 +134,18 @@ class RegistrationService {
         throw new Error('Пользователь с таким логином уже существует');
       }
 
-      // Проверка существования пользователя по sync_1c_id
+      // Проверка существования пользователя по sync_1c_id и роли
       if (mappedData.sync_1c_id) {
         const { query } = require('../../config/database');
         const existingByCode = await query(
-          'SELECT * FROM users WHERE sync_1c_id = $1',
+          `SELECT u.*, r.role_name FROM users u 
+           JOIN roles r ON u.role_id = r.role_id 
+           WHERE u.sync_1c_id = $1 AND r.role_name = 'student'`,
           [mappedData.sync_1c_id]
         );
         if (existingByCode.rows.length > 0) {
           const existing = existingByCode.rows[0];
+          
           // Если пользователь существует но без username, обновляем его
           if (!existing.username) {
             // Обновляем username, пароль и активируем пользователя
@@ -161,6 +164,8 @@ class RegistrationService {
             throw new Error('Пользователь с таким кодом уже зарегистрирован');
           }
         }
+        // Если найден пользователь с таким же кодом, но другой ролью - это нормально,
+        // коды студентов и преподавателей могут совпадать, создаем нового пользователя
       }
 
       // Создание/получение кафедры
@@ -271,8 +276,13 @@ class RegistrationService {
       // Создание/обновление общегруппового чата (только групповой чат, не приватные)
       let groupChat = null;
       if (studentData1C.Группа) {
+        logger.info(`[registerStudent] Создание/получение группового чата для группы: ${studentData1C.Группа}`);
         groupChat = await chatService.createOrUpdateGroupChat(studentData1C.Группа);
+        logger.info(`[registerStudent] Групповой чат создан/получен: chat_id=${groupChat.chat_id}, name=${groupChat.chat_name}`);
         await chatService.addUserToGroupChat(groupChat.chat_id, user.user_id);
+        logger.info(`[registerStudent] Пользователь ${user.user_id} добавлен в групповой чат ${groupChat.chat_id}`);
+      } else {
+        logger.warn(`[registerStudent] Группа не указана для студента ${user.user_id}`);
       }
 
       // Примечание: Приватные чаты с конкретными пользователями НЕ создаются автоматически
@@ -312,15 +322,18 @@ class RegistrationService {
         throw new Error('Пользователь с таким логином уже существует');
       }
 
-      // Проверка существования пользователя по sync_1c_id
+      // Проверка существования пользователя по sync_1c_id и роли
       if (mappedData.sync_1c_id) {
         const { query } = require('../../config/database');
         const existingByCode = await query(
-          'SELECT * FROM users WHERE sync_1c_id = $1',
+          `SELECT u.*, r.role_name FROM users u 
+           JOIN roles r ON u.role_id = r.role_id 
+           WHERE u.sync_1c_id = $1 AND r.role_name = 'teacher'`,
           [mappedData.sync_1c_id]
         );
         if (existingByCode.rows.length > 0) {
           const existing = existingByCode.rows[0];
+          
           // Если пользователь существует но без username, обновляем его
           if (!existing.username) {
             // Обновляем username, пароль и активируем пользователя
@@ -339,6 +352,8 @@ class RegistrationService {
             throw new Error('Пользователь с таким кодом уже зарегистрирован');
           }
         }
+        // Если найден пользователь с таким же кодом, но другой ролью - это нормально,
+        // коды студентов и преподавателей могут совпадать, создаем нового пользователя
       }
 
       // Создание/получение дисциплины

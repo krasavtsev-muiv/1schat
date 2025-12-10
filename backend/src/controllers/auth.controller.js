@@ -356,7 +356,28 @@ const getUsers = async (req, res) => {
       filters.search = search;
     }
 
-    const users = await User.findAll(filters);
+    // Получаем текущего пользователя
+    const currentUser = await User.findById(req.userId);
+    if (!currentUser) {
+      return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+
+    let users;
+    
+    // Для студентов применяем фильтрацию по группам и дисциплинам
+    if (currentUser.role_name === 'student') {
+      logger.info(`[getUsers] Получение контактов для студента ${req.userId} (группа: ${currentUser.student_group})`);
+      users = await User.findContactsForStudent(req.userId, filters);
+      logger.info(`[getUsers] Найдено контактов для студента ${req.userId}: ${users.length}`);
+    } else if (currentUser.role_name === 'teacher') {
+      // Для преподавателей показываем только студентов с пересекающимися дисциплинами
+      logger.info(`[getUsers] Получение контактов для преподавателя ${req.userId}`);
+      users = await User.findContactsForTeacher(req.userId, filters);
+      logger.info(`[getUsers] Найдено контактов для преподавателя ${req.userId}: ${users.length}`);
+    } else {
+      // Для администраторов показываем всех пользователей
+      users = await User.findAll(filters);
+    }
     
     // Удаляем пароли из ответа
     const usersWithoutPasswords = users.map(user => {

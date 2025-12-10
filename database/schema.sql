@@ -35,7 +35,7 @@ CREATE TABLE users (
     last_online TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    sync_1c_id VARCHAR(100) UNIQUE
+    sync_1c_id VARCHAR(100)
 );
 
 -- Таблица чатов
@@ -248,6 +248,8 @@ CREATE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username 
 CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
 CREATE INDEX IF NOT EXISTS idx_users_sync_1c_id ON users(sync_1c_id) WHERE sync_1c_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_last_online ON users(last_online);
+-- Составной уникальный индекс: один sync_1c_id может быть у студента и преподавателя, но не у двух пользователей одной роли
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_sync_1c_id_role_id ON users(sync_1c_id, role_id) WHERE sync_1c_id IS NOT NULL;
 
 -- Индексы для таблицы chats
 CREATE INDEX IF NOT EXISTS idx_chats_created_by ON chats(created_by);

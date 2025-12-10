@@ -51,7 +51,6 @@ export default function Header() {
   const authMenuItems = [
     { href: '/chats', label: 'Чаты' },
     { href: '/dashboard/profile', label: 'Профиль' },
-    { href: '/dashboard/notifications', label: 'Уведомления' },
   ];
 
   const adminMenuItems = [

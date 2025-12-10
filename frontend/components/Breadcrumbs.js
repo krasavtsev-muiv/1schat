@@ -23,7 +23,6 @@ export default function Breadcrumbs() {
     'admin': 'Административная панель',
     'profile': 'Профиль',
     'settings': 'Настройки',
-    'notifications': 'Уведомления',
     'export': 'Экспорт',
     'users': 'Пользователи',
     'chats': 'Чаты',
