@@ -26,12 +26,12 @@ ENV PORT=80
 ENV HOSTNAME="0.0.0.0"
 ENV BACKEND_URL=http://backend:3001
 
-# Копируем package.json и package-lock.json для установки production зависимостей
+# Копируем package.json для информации о зависимостях
 COPY --from=builder /app/package*.json ./
 
-# Устанавливаем только production зависимости
-# Используем npm install вместо npm ci для большей гибкости
-RUN npm install --omit=dev
+# Копируем node_modules из builder стадии (только production зависимости)
+# Это важно для custom server - зависимости должны совпадать с теми, что использовались при сборке
+COPY --from=builder /app/node_modules ./node_modules
 
 # Копируем собранное приложение и исходники
 COPY --from=builder /app/.next ./.next
