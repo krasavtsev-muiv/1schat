@@ -7,7 +7,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Устанавливаем все зависимости (нужны для сборки)
-RUN npm ci
+# Используем npm install вместо npm ci для большей гибкости
+RUN npm install
 
 # Копируем остальные файлы
 COPY . .
@@ -29,7 +30,8 @@ ENV BACKEND_URL=http://backend:3001
 COPY --from=builder /app/package*.json ./
 
 # Устанавливаем только production зависимости
-RUN npm ci --omit=dev
+# Используем npm install вместо npm ci для большей гибкости
+RUN npm install --omit=dev
 
 # Копируем собранное приложение и исходники
 COPY --from=builder /app/.next ./.next
