@@ -11,6 +11,7 @@ export default function ChatWindow({ chat, onChatCreated }) {
   const [loading, setLoading] = useState(true);
   const [currentChatId, setCurrentChatId] = useState(null);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (chat && chat.chat_id) {
@@ -155,7 +156,10 @@ export default function ChatWindow({ chat, onChatCreated }) {
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Прокручиваем только если поле ввода не в фокусе, чтобы не мешать пользователю
+    if (document.activeElement !== inputRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   // Функция для получения отображаемого имени чата (такая же как в ChatList)
@@ -169,7 +173,43 @@ export default function ChatWindow({ chat, onChatCreated }) {
     return chat.chat_name || 'Без названия';
   };
 
-  if (!chat) return <div>Выберите чат</div>;
+  if (!chat) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100%',
+        padding: '2rem',
+        textAlign: 'center',
+        color: '#6c757d'
+      }}>
+        <div style={{ maxWidth: '500px' }}>
+          <h2 style={{ color: '#495057', marginBottom: '1.5rem' }}>Добро пожаловать в чат!</h2>
+          <div style={{ fontSize: '1rem', lineHeight: '1.6' }}>
+            <p style={{ marginBottom: '1rem' }}>
+              <strong>Как начать общение:</strong>
+            </p>
+            <ol style={{ textAlign: 'left', display: 'inline-block', margin: 0, paddingLeft: '1.5rem' }}>
+              <li style={{ marginBottom: '0.75rem' }}>
+                Используйте поле <strong>"Поиск контактов..."</strong> в левой панели для поиска пользователей
+              </li>
+              <li style={{ marginBottom: '0.75rem' }}>
+                Нажмите на контакт из списка, чтобы начать личный чат
+              </li>
+              <li style={{ marginBottom: '0.75rem' }}>
+                Или создайте групповой чат, нажав кнопку <strong>"+ Создать групповой чат"</strong>
+              </li>
+              <li>
+                Выберите существующий чат из раздела <strong>"Мои чаты"</strong> для продолжения общения
+              </li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (loading && chat.chat_id) return <div>Загрузка сообщений...</div>;
 
   return (
@@ -194,10 +234,12 @@ export default function ChatWindow({ chat, onChatCreated }) {
       </div>
       <form onSubmit={sendMessage} style={{ padding: '1rem', borderTop: '1px solid #dee2e6' }}>
         <input
+          ref={inputRef}
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Введите сообщение..."
+          autoFocus={false}
           style={{ width: '100%', padding: '0.5rem' }}
         />
       </form>

@@ -224,8 +224,8 @@ export default function ContactList({ onStartChat, refreshKey, currentUserId }) 
   if (loading) return <div style={{ padding: '1rem', color: '#666' }}>Загрузка контактов...</div>;
 
   return (
-    <div>
-      <div style={{ marginBottom: '0.75rem' }}>
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ marginBottom: '0.75rem', flexShrink: 0 }}>
         <input
           type="text"
           placeholder="Поиск контактов..."
@@ -245,7 +245,7 @@ export default function ContactList({ onStartChat, refreshKey, currentUserId }) 
           {searchQuery ? 'Контакты не найдены' : 'Не нашли подходящих контактов'}
         </p>
       ) : (
-        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           {contacts.map((contact) => (
             <div
               key={contact.user_id}

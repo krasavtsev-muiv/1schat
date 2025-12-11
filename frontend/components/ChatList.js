@@ -62,11 +62,11 @@ export default function ChatList({ onSelectChat, refreshKey }) {
   };
 
   return (
-    <div>
+    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       {chats.length === 0 ? (
         <p style={{ padding: '1rem', color: '#666', fontSize: '0.9rem' }}>Нет чатов</p>
       ) : (
-        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
           {chats.map((chat) => (
             <div
               key={chat.chat_id}

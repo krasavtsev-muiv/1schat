@@ -349,7 +349,7 @@ function CreateChatModal({ onClose, onSuccess }) {
                     key={user.user_id}
                     onClick={() => toggleUserSelection(user.user_id)}
                     style={{
-                      padding: '0.5rem',
+                      padding: '0.75rem',
                       marginBottom: '0.25rem',
                       background: selectedUsers.includes(user.user_id) ? '#0070f3' : '#f8f9fa',
                       color: selectedUsers.includes(user.user_id) ? 'white' : 'black',
@@ -357,7 +357,18 @@ function CreateChatModal({ onClose, onSuccess }) {
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
+                      gap: '0.75rem',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!selectedUsers.includes(user.user_id)) {
+                        e.currentTarget.style.background = '#e9ecef';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!selectedUsers.includes(user.user_id)) {
+                        e.currentTarget.style.background = '#f8f9fa';
+                      }
                     }}
                   >
                     <input
@@ -365,10 +376,19 @@ function CreateChatModal({ onClose, onSuccess }) {
                       checked={selectedUsers.includes(user.user_id)}
                       onChange={() => toggleUserSelection(user.user_id)}
                       onClick={(e) => e.stopPropagation()}
+                      style={{ flexShrink: 0 }}
                     />
-                    <span>
-                      {user.first_name} {user.last_name} {user.username && `(@${user.username})`}
-                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '500' }}>
+                        {user.first_name} {user.last_name} {user.middle_name || ''}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: selectedUsers.includes(user.user_id) ? 'rgba(255,255,255,0.9)' : '#6c757d', marginTop: '0.25rem' }}>
+                        {user.role_name === 'student' ? 'Студент' : 
+                         user.role_name === 'teacher' ? 'Преподаватель' : 
+                         user.role_name === 'admin' ? 'Администратор' : user.role_name}
+                        {user.student_group && ` • ${user.student_group}`}
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
