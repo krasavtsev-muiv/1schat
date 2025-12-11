@@ -2,7 +2,7 @@
 const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
-const { createProxyServer } = require('http-proxy-middleware');
+const httpProxy = require('http-proxy');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = '0.0.0.0';
@@ -14,6 +14,21 @@ const handle = app.getRequestHandler();
 // URL бэкенда из переменной окружения или дефолтный
 const backendUrl = process.env.BACKEND_URL || 'http://backend:3001';
 
+// Создаем proxy сервер
+const proxy = httpProxy.createProxyServer({
+  changeOrigin: true,
+  ws: true,
+});
+
+// Обработка ошибок proxy
+proxy.on('error', (err, req, res) => {
+  console.error('Proxy error:', err);
+  if (res && !res.headersSent) {
+    res.statusCode = 502;
+    res.end('Bad Gateway');
+  }
+});
+
 app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
@@ -22,59 +37,19 @@ app.prepare().then(() => {
 
       // Проксирование WebSocket для Socket.IO
       if (pathname.startsWith('/socket.io')) {
-        const proxy = createProxyServer({
-          target: backendUrl,
-          ws: true,
-          changeOrigin: true,
-        });
-        
-        proxy.on('error', (err, req, res) => {
-          console.error('Proxy error:', err);
-          if (!res.headersSent) {
-            res.statusCode = 502;
-            res.end('Bad Gateway');
-          }
-        });
-        
-        proxy.web(req, res);
+        proxy.web(req, res, { target: backendUrl });
         return;
       }
 
       // Проксирование API запросов
       if (pathname.startsWith('/api')) {
-        const proxy = createProxyServer({
-          target: backendUrl,
-          changeOrigin: true,
-        });
-        
-        proxy.on('error', (err, req, res) => {
-          console.error('Proxy error:', err);
-          if (!res.headersSent) {
-            res.statusCode = 502;
-            res.end('Bad Gateway');
-          }
-        });
-        
-        proxy.web(req, res);
+        proxy.web(req, res, { target: backendUrl });
         return;
       }
 
       // Проксирование health check
       if (pathname === '/health') {
-        const proxy = createProxyServer({
-          target: backendUrl,
-          changeOrigin: true,
-        });
-        
-        proxy.on('error', (err, req, res) => {
-          console.error('Proxy error:', err);
-          if (!res.headersSent) {
-            res.statusCode = 502;
-            res.end('Bad Gateway');
-          }
-        });
-        
-        proxy.web(req, res);
+        proxy.web(req, res, { target: backendUrl });
         return;
       }
 
@@ -92,13 +67,7 @@ app.prepare().then(() => {
     const { pathname } = parse(req.url, true);
     
     if (pathname.startsWith('/socket.io')) {
-      const proxy = createProxyServer({
-        target: backendUrl,
-        ws: true,
-        changeOrigin: true,
-      });
-      
-      proxy.ws(req, socket, head);
+      proxy.ws(req, socket, head, { target: backendUrl });
     } else {
       socket.destroy();
     }
