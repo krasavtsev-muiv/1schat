@@ -35,7 +35,8 @@ RUN npm install --omit=dev
 
 # Копируем собранное приложение и исходники
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
+# Создаем директорию public (она может отсутствовать в проекте, Next.js работает без неё)
+RUN mkdir -p ./public
 COPY --from=builder /app/server.js ./server.js
 COPY --from=builder /app/next.config.js ./next.config.js
 
