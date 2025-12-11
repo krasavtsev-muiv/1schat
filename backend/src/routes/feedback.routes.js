@@ -10,6 +10,12 @@ router.post('/', feedbackController.createFeedback);
 // Получение списка обращений (только для администраторов)
 router.get('/', authenticateToken, requireRole('admin'), feedbackController.getFeedbackList);
 
+// Получение обращения по ID (только для администраторов)
+router.get('/:feedbackId', authenticateToken, requireRole('admin'), feedbackController.getFeedbackById);
+
+// Обновление статуса обращения (только для администраторов)
+router.put('/:feedbackId/status', authenticateToken, requireRole('admin'), feedbackController.updateFeedbackStatus);
+
 // Ответ на обращение (только для администраторов)
 router.put('/:feedbackId/respond', authenticateToken, requireRole('admin'), feedbackController.respondToFeedback);
 

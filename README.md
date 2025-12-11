@@ -55,6 +55,16 @@ docker-compose up -d postgres
   - `DB_PASSWORD=postgres`
 - JWT_SECRET (измените на случайный ключ)
 - ONE_C_API_URL (URL вашего HTTP-сервиса 1С)
+- Настройки SMTP для отправки email (опционально, для обратной связи):
+  - `SMTP_HOST=smtp.example.com` (например, smtp.gmail.com, smtp.mail.ru)
+  - `SMTP_PORT=587` (обычно 587 для TLS или 465 для SSL)
+  - `SMTP_SECURE=false` (true для порта 465, false для 587)
+  - `SMTP_USER=your-email@example.com`
+  - `SMTP_PASSWORD=your-password` (или app password для Gmail)
+  - `SMTP_FROM_EMAIL=your-email@example.com` (от какого email отправлять, по умолчанию SMTP_USER)
+  - `SMTP_FROM_NAME=Веб-сервис чата` (имя отправителя)
+  
+  **Примечание**: Если SMTP не настроен, ответы на обращения будут сохраняться в базе данных, но email не будет отправляться.
 
 ### База данных (Docker)
 
