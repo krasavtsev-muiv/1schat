@@ -22,9 +22,16 @@ if [ "$FORCE" != "true" ]; then
     fi
 fi
 
+# Определяем команду для docker compose
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    DOCKER_COMPOSE="docker-compose"
+fi
+
 echo ""
 echo "🛑 Остановка всех контейнеров и удаление volumes..."
-docker-compose down -v || docker compose down -v
+$DOCKER_COMPOSE down -v
 
 echo ""
 echo "🗑️  Удаление контейнера базы данных (если остался)..."
@@ -33,8 +40,8 @@ docker rm -f chat_db 2>/dev/null || echo "Контейнер chat_db не най
 echo ""
 echo "🗑️  Проверка и удаление volume с данными базы данных (если остался)..."
 
-# Определяем имя volume через docker-compose config
-VOLUME_NAME=$(docker-compose config --volumes 2>/dev/null | grep postgres_data | head -1 || true)
+# Определяем имя volume через docker compose config
+VOLUME_NAME=$($DOCKER_COMPOSE config --volumes 2>/dev/null | grep postgres_data | head -1 || true)
 
 if [ -z "$VOLUME_NAME" ]; then
     # Если docker-compose не помог, определяем имя проекта
@@ -60,7 +67,7 @@ fi
 
 echo ""
 echo "🔨 Запуск контейнеров с чистой базой данных..."
-docker-compose up -d || docker compose up -d
+$DOCKER_COMPOSE up -d
 
 echo ""
 echo "⏳ Ожидание готовности базы данных..."
@@ -68,7 +75,7 @@ sleep 10
 
 echo ""
 echo "📊 Статус контейнеров:"
-docker-compose ps || docker compose ps
+$DOCKER_COMPOSE ps
 
 echo ""
 echo "✅ База данных успешно сброшена!"

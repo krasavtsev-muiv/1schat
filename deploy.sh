@@ -14,9 +14,16 @@ if ! command -v docker &> /dev/null; then
 fi
 
 # Проверка наличия Docker Compose
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+if ! docker compose version &> /dev/null && ! command -v docker-compose &> /dev/null; then
     echo "❌ Docker Compose не установлен. Установите Docker Compose и повторите попытку."
     exit 1
+fi
+
+# Определяем команду для docker compose
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    DOCKER_COMPOSE="docker-compose"
 fi
 
 # Проверка наличия .env файла
@@ -29,19 +36,19 @@ fi
 
 # Остановка существующих контейнеров
 echo "🛑 Остановка существующих контейнеров..."
-docker-compose down || docker compose down
+$DOCKER_COMPOSE down
 
 # Удаление старых образов (опционально, закомментируйте если не нужно)
 # echo "🗑️  Удаление старых образов..."
-# docker-compose rm -f || docker compose rm -f
+# $DOCKER_COMPOSE rm -f
 
 # Сборка новых образов
 echo "🔨 Сборка образов..."
-docker-compose build --no-cache || docker compose build --no-cache
+$DOCKER_COMPOSE build --no-cache
 
 # Запуск контейнеров
 echo "▶️  Запуск контейнеров..."
-docker-compose up -d || docker compose up -d
+$DOCKER_COMPOSE up -d
 
 # Ожидание готовности базы данных
 echo "⏳ Ожидание готовности базы данных..."
@@ -49,18 +56,18 @@ sleep 10
 
 # Проверка статуса контейнеров
 echo "📊 Статус контейнеров:"
-docker-compose ps || docker compose ps
+$DOCKER_COMPOSE ps
 
 # Показ логов
 echo ""
-echo "📋 Последние логи (для просмотра всех логов используйте: docker-compose logs -f):"
-docker-compose logs --tail=50 || docker compose logs --tail=50
+echo "📋 Последние логи (для просмотра всех логов используйте: $DOCKER_COMPOSE logs -f):"
+$DOCKER_COMPOSE logs --tail=50
 
 echo ""
 echo "✅ Деплой завершен!"
 echo ""
 echo "Полезные команды:"
-echo "  - Просмотр логов: docker-compose logs -f"
-echo "  - Остановка: docker-compose down"
-echo "  - Перезапуск: docker-compose restart"
-echo "  - Статус: docker-compose ps"
+echo "  - Просмотр логов: $DOCKER_COMPOSE logs -f"
+echo "  - Остановка: $DOCKER_COMPOSE down"
+echo "  - Перезапуск: $DOCKER_COMPOSE restart"
+echo "  - Статус: $DOCKER_COMPOSE ps"
