@@ -11,6 +11,9 @@ export default function Breadcrumbs() {
   const breadcrumbMap = {
     '': 'Главная',
     'about': 'О системе',
+    'features': 'Возможности',
+    'getting-started': 'Быстрый старт',
+    'security': 'Безопасность',
     'contacts': 'Контакты',
     'feedback': 'Обратная связь',
     'faq': 'FAQ',
@@ -18,16 +21,25 @@ export default function Breadcrumbs() {
     'terms': 'Правила',
     'login': 'Вход',
     'register': 'Регистрация',
-    'dashboard': 'Дашборд',
     'chats': 'Чаты',
     'admin': 'Административная панель',
     'profile': 'Профиль',
     'settings': 'Настройки',
-    'export': 'Экспорт',
     'users': 'Пользователи',
-    'chats': 'Чаты',
     '1c': 'Интеграция с 1С',
   };
+
+  // Специальная обработка для страницы безопасности - добавляем "Политика безопасности"
+  const getBreadcrumbLabel = (path, index, allPaths) => {
+    // Для страницы безопасности добавляем "Политика безопасности" в конце
+    if (path === 'security' && index === allPaths.length - 1) {
+      return 'Политика безопасности';
+    }
+    return breadcrumbMap[path] || path;
+  };
+
+  // Фильтруем paths, убирая dashboard
+  const visiblePaths = paths.filter(p => p !== 'dashboard');
 
   return (
     <nav style={{ padding: '1rem', background: '#f8f9fa', borderBottom: '1px solid #dee2e6' }}>
@@ -37,26 +49,27 @@ export default function Breadcrumbs() {
             Главная
           </Link>
         </li>
-        {paths.map((path, index) => {
-          const href = '/' + paths.slice(0, index + 1).join('/');
-          const label = breadcrumbMap[path] || path;
-          const isLast = index === paths.length - 1;
+        {visiblePaths.map((path, index) => {
+            const href = '/' + visiblePaths.slice(0, index + 1).join('/');
+            // Находим оригинальный индекс в paths для правильной проверки isLast
+            const originalIndex = paths.indexOf(path);
+            const label = getBreadcrumbLabel(path, originalIndex, paths);
+            const isLast = index === visiblePaths.length - 1;
 
-          return (
-            <li key={href} style={{ display: 'flex', alignItems: 'center' }}>
-              <span style={{ margin: '0 0.5rem' }}>/</span>
-              {isLast ? (
-                <span>{label}</span>
-              ) : (
-                <Link href={href} style={{ color: '#0070f3', textDecoration: 'none' }}>
-                  {label}
-                </Link>
-              )}
-            </li>
-          );
-        })}
+            return (
+              <li key={href} style={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ margin: '0 0.5rem' }}>/</span>
+                {isLast ? (
+                  <span>{label}</span>
+                ) : (
+                  <Link href={href} style={{ color: '#0070f3', textDecoration: 'none' }}>
+                    {label}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
       </ol>
     </nav>
   );
 }
-

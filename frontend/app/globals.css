@@ -45,3 +45,13 @@ input, textarea {
   --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Скрытие скроллбара для горизонтального меню */
+header nav ul::-webkit-scrollbar {
+  display: none;
+}
+
+header nav ul {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
