@@ -15,7 +15,9 @@ export const initSocket = () => {
     return null;
   }
 
-  socket = io(process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001', {
+  // Используем относительный путь для WebSocket (будет проксироваться через custom server)
+  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+  socket = io(wsUrl, {
     auth: {
       token: token,
     },

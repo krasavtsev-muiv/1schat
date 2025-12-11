@@ -4,9 +4,9 @@
   "description": "Frontend для веб-сервиса чата",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node server.js",
     "build": "next build",
-    "start": "next start",
+    "start": "node server.js",
     "lint": "next lint"
   },
   "dependencies": {
@@ -15,7 +15,8 @@
     "react-dom": "^18.2.0",
     "socket.io-client": "^4.6.1",
     "axios": "^1.6.2",
-    "js-cookie": "^3.0.5"
+    "js-cookie": "^3.0.5",
+    "http-proxy-middleware": "^2.0.6"
   },
   "devDependencies": {
     "@types/node": "^20.10.5",

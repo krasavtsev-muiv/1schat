@@ -2,8 +2,12 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
 
+// Используем относительные пути, так как API проксируется через Next.js rewrites
+// Если NEXT_PUBLIC_API_URL не установлен, используем относительные пути
+const baseURL = process.env.NEXT_PUBLIC_API_URL || '';
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+  baseURL: baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
